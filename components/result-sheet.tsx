@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 
 type ResultSheetProps = {
   diagnosis: any;
@@ -10,20 +11,39 @@ type ResultSheetProps = {
 
 export function ResultSheet({ diagnosis, onRestartHref = '/', savedAt }: ResultSheetProps) {
   const d = diagnosis;
+  const savedLabel = useMemo(
+    () => (savedAt ? new Date(savedAt).toLocaleString('ko-KR') : null),
+    [savedAt],
+  );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_24px_80px_rgba(28,25,23,0.08)] backdrop-blur sm:p-8 lg:p-10">
-        <div className="flex items-baseline justify-between gap-4">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 print:max-w-none print:px-0 print:py-0">
+      <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_24px_80px_rgba(28,25,23,0.08)] backdrop-blur sm:p-8 lg:p-10 print:rounded-none print:border-0 print:bg-white print:p-6 print:shadow-none">
+        <div className="flex items-baseline justify-between gap-4 print:hidden">
           <div>
             <div className="mono text-[11px] uppercase tracking-[0.28em] text-stone-400">Result Sheet</div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">진단 결과</h1>
             <p className="mt-1 text-sm text-stone-600">원자료 기반 · 한국은행 2024 업종 평균 반영</p>
-            {savedAt && <p className="mt-1 text-xs text-stone-400">저장 시각: {new Date(savedAt).toLocaleString('ko-KR')}</p>}
+            {savedLabel && <p className="mt-1 text-xs text-stone-400">저장 시각: {savedLabel}</p>}
           </div>
-          <Link href={onRestartHref} className="mono text-xs text-stone-500 underline">
-            다시 진단
-          </Link>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.print()}
+              className="rounded-xl border border-stone-900 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-900 hover:text-white"
+            >
+              PDF로 저장
+            </button>
+            <Link href={onRestartHref} className="mono text-xs text-stone-500 underline">
+              다시 진단
+            </Link>
+          </div>
+        </div>
+
+        <div className="hidden print:block">
+          <div className="mono text-[11px] uppercase tracking-[0.28em] text-stone-400">Result Sheet</div>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">진단 결과</h1>
+          <p className="mt-1 text-sm text-stone-600">원자료 기반 · 한국은행 2024 업종 평균 반영</p>
+          {savedLabel && <p className="mt-1 text-xs text-stone-400">저장 시각: {savedLabel}</p>}
         </div>
 
         <Section num="01" title="경영지표">

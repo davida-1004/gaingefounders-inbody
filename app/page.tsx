@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { saveResultRecord } from '../lib/result-storage';
+import { deleteSavedResult, listSavedResults, saveResultRecord, type SavedResultRecord } from '../lib/result-storage';
 
 /* ============================================================================
  * Founders Inbody v3 — Single-File MVP
@@ -845,6 +846,11 @@ export default function Page() {
   const router = useRouter();
   const [step, setStep] = useState<number>(0);
   const [answers, setAnswers] = useState<Answers>({});
+  const [savedResults, setSavedResults] = useState<SavedResultRecord[]>([]);
+
+  useEffect(() => {
+    setSavedResults(listSavedResults());
+  }, []);
 
   const setA = <K extends keyof Answers>(k: K, v: Answers[K]) =>
     setAnswers((prev) => ({ ...prev, [k]: v }));
@@ -867,6 +873,7 @@ export default function Page() {
       diagnosis,
     });
     if (saved) {
+      setSavedResults(listSavedResults());
       router.push(`/result/${saved.id}`);
       return;
     }
@@ -911,6 +918,57 @@ export default function Page() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-6 rounded-[1.6rem] border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-stone-500">최근 진단 다시보기</div>
+                  <div className="mt-1 text-sm font-medium text-stone-900">같은 기기에서는 로그인 없이 다시 볼 수 있습니다.</div>
+                </div>
+                <div className="mono text-xs text-stone-400">{savedResults.length} saved</div>
+              </div>
+
+              {savedResults.length === 0 ? (
+                <p className="mt-4 text-sm leading-relaxed text-stone-500">
+                  아직 저장된 결과가 없습니다. 진단을 완료하면 최근 결과가 여기에 쌓입니다.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {savedResults.slice(0, 5).map((item) => {
+                    const input = item.input as Record<string, any>;
+                    const dashboard = item.diagnosis?.dashboard ?? [];
+                    const firstMetric = dashboard[0];
+                    return (
+                      <div key={item.id} className="rounded-2xl border border-stone-200 bg-[#fffdf9] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-stone-900">{input.industry ?? '업종 미상'}</div>
+                            <div className="mt-1 text-[11px] text-stone-500">{new Date(item.createdAt).toLocaleString('ko-KR')}</div>
+                            {firstMetric && (
+                              <div className="mt-2 text-xs leading-relaxed text-stone-600">
+                                {firstMetric.label}: {firstMetric.value}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              deleteSavedResult(item.id);
+                              setSavedResults(listSavedResults());
+                            }}
+                            className="text-xs text-stone-400 underline"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                        <Link href={`/result/${item.id}`} className="mt-3 inline-block text-xs font-medium text-stone-900 underline">
+                          다시보기
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </aside>
         </div>

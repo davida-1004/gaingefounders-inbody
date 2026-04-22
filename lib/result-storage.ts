@@ -49,3 +49,11 @@ export function saveResultRecord(record: Omit<SavedResultRecord, 'id' | 'created
   storage.setItem(STORAGE_KEY, JSON.stringify(next));
   return saved;
 }
+
+export function deleteSavedResult(id: string) {
+  const storage = getStorage();
+  if (!storage) return;
+
+  const next = listSavedResults().filter((item) => item.id !== id);
+  storage.setItem(STORAGE_KEY, JSON.stringify(next));
+}

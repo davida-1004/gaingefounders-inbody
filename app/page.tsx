@@ -410,7 +410,7 @@ function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): D
   // ── 5. 현금 전략 (GCS) ──
   const cashAdvice = buildCashAdvice(d.gcsStage);
 
-  // ── 6. 경영 계기판 ──
+  // ── 6. 경영 지표 ──
   const dashboard = buildDashboard(a, d, bm);
   const metricGuide = buildMetricGuide();
 
@@ -842,7 +842,7 @@ function Brand() {
         <span className="mono text-xs text-stone-500">v3</span>
       </div>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600">
-        금액은 원 단위로, 인원과 거래처는 각 단위에 맞게 입력받습니다. 결과는 계기판이 먼저 나오고 그 숫자를 해석하는 진단 문장이 뒤따릅니다.
+        금액은 원 단위로, 인원과 거래처는 각 단위에 맞게 입력받습니다. 결과는 경영지표가 먼저 나오고 그 숫자를 해석하는 진단 문장이 뒤따릅니다.
       </p>
     </div>
   );
@@ -1412,7 +1412,7 @@ function ResultView({ diagnosis, onRestart }: { diagnosis: Diagnosis; onRestart:
             <button onClick={onRestart} className="mono text-xs text-stone-500 underline">다시 진단</button>
           </div>
 
-          <Section num="01" title="경영 계기판">
+          <Section num="01" title="경영지표">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {d.dashboard.map((m, i) => (
                 <div key={i} className={`${i === 0 ? 'border-stone-900 bg-stone-900 text-white' : 'border-stone-200 bg-[#fffdf9] text-stone-900'} rounded-[1.6rem] border p-5 shadow-sm`}>
@@ -1424,7 +1424,7 @@ function ResultView({ diagnosis, onRestart }: { diagnosis: Diagnosis; onRestart:
             </div>
           </Section>
 
-          <Section num="02" title="계기판 해석">
+          <Section num="02" title="경영지표 해석">
             <div className="rounded-[1.8rem] border border-stone-900 bg-stone-900 p-6 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)]">
               <div className="mono text-xs text-stone-400">{d.type}</div>
               <p className="mt-3 text-lg leading-relaxed">{d.headline.asIs}</p>

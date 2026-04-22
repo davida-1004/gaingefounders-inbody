@@ -23,30 +23,93 @@ import { deleteSavedResult, listSavedResults, saveResultRecord, type SavedResult
  *  Part 1 — 타입 정의
  * ==========================================================================*/
 
-type Industry =
-  | 'MFG_B2B' | 'MFG_B2C'
-  | 'RETAIL'
-  | 'ECOMMERCE'
-  | 'IT'
-  | 'EDUCATION'
-  | 'CONSULTING'
+type IndustryCategory =
+  | 'DISTRIBUTION'
+  | 'MANUFACTURING'
+  | 'IT_SOFTWARE'
+  | 'EDU_CONSULTING'
+  | 'SERVICE'
+  | 'BEAUTY_LIFESTYLE'
+  | 'HEALTHCARE'
+  | 'MARKETING_AD'
+  | 'CONSTRUCTION_RE'
+  | 'FINANCE'
   | 'CONTENT_MEDIA'
-  | 'MEDICAL_GENERAL' | 'MEDICAL_AESTHETIC'
-  | 'BEAUTY'
-  | 'HEALTH_SERVICE' | 'HEALTH_PRODUCT' | 'HEALTH_TECH'
-  | 'REALESTATE_BROKERAGE' | 'REALESTATE_DEV'
-  | 'MARKETING_RETAINER' | 'MARKETING_PROJECT'
-  | 'SERVICE';
+  | 'OTHER';
+
+type IndustrySubcategory =
+  | 'DST_ECOMMERCE' | 'DST_OFFLINE' | 'DST_WHOLESALE' | 'DST_LOGISTICS'
+  | 'MFG_CONSUMER' | 'MFG_INDUSTRIAL' | 'MFG_OEM' | 'MFG_AGRI_FOOD'
+  | 'IT_SAAS_B2B' | 'IT_SAAS_B2C' | 'IT_PLATFORM' | 'IT_SI_DEV' | 'IT_GAME' | 'IT_AI_DATA'
+  | 'EDU_ACADEMY' | 'EDU_ONLINE' | 'EDU_B2B_TRAINING' | 'EDU_CONSULTING'
+  | 'SVC_F_AND_B' | 'SVC_HOSPITALITY' | 'SVC_PROFESSIONAL' | 'SVC_WEDDING_EVENT' | 'SVC_PET' | 'SVC_AUTO' | 'SVC_ARTS' | 'SVC_OTHER'
+  | 'BTY_SALON' | 'BTY_FITNESS' | 'BTY_COSMETICS' | 'BTY_FASHION'
+  | 'HC_INSURED' | 'HC_ELECTIVE' | 'HC_DIGITAL' | 'HC_DEVICE'
+  | 'MKT_PERFORMANCE' | 'MKT_BRANDING' | 'MKT_DESIGN'
+  | 'CON_BUILD' | 'CON_INTERIOR' | 'RE_BROKERAGE' | 'RE_DEVELOPMENT'
+  | 'FIN_INVEST' | 'FIN_LENDING' | 'FIN_INSURANCE' | 'FIN_FINTECH'
+  | 'CNT_CREATOR' | 'CNT_PUBLISHING' | 'CNT_PRODUCTION';
 
 type RevenueSource = 'PRIVATE' | 'PUBLIC' | 'MIX' | 'GOV';
+type BusinessModel =
+  | 'DIST_D2C'
+  | 'DIST_RETAIL'
+  | 'DIST_WHOLESALE'
+  | 'DIST_LOGISTICS'
+  | 'MFG_BRAND'
+  | 'MFG_OEM'
+  | 'MFG_B2B_SUPPLY'
+  | 'MFG_RND_GOV'
+  | 'IT_B2B_SUBSCRIPTION'
+  | 'IT_B2C_SUBSCRIPTION'
+  | 'IT_PLATFORM_FEE'
+  | 'IT_PROJECT_BUILD'
+  | 'IT_AD_DATA'
+  | 'EDU_B2C_CLASS'
+  | 'EDU_B2B_TRAINING'
+  | 'CONSULTING_PROJECT'
+  | 'CONSULTING_RETAINER'
+  | 'EDU_VOUCHER_GOV'
+  | 'SVC_OFFLINE'
+  | 'SVC_BOOKING'
+  | 'SVC_B2B_CONTRACT'
+  | 'SVC_FRANCHISE_EVENT'
+  | 'BEAUTY_SERVICE'
+  | 'BEAUTY_MEMBERSHIP'
+  | 'BEAUTY_PRODUCT'
+  | 'BEAUTY_COMMERCE'
+  | 'HC_INSURED_REVENUE'
+  | 'HC_ELECTIVE_REVENUE'
+  | 'HC_B2B_INSTITUTION'
+  | 'HC_DIGITAL_SUBSCRIPTION'
+  | 'HC_DEVICE_SALES'
+  | 'MKT_MEDIA_BUYING'
+  | 'MKT_PROJECT'
+  | 'MKT_RETAINER'
+  | 'MKT_CREATIVE_PRODUCTION'
+  | 'RE_CONSTRUCTION'
+  | 'RE_INTERIOR'
+  | 'RE_BROKERAGE_FEE'
+  | 'RE_RENTAL_DEV'
+  | 'FIN_COMMISSION'
+  | 'FIN_SPREAD'
+  | 'FIN_AUM'
+  | 'FIN_FINTECH_FEE'
+  | 'CNT_AD_SPONSORSHIP'
+  | 'CNT_PAID_SUBSCRIPTION'
+  | 'CNT_PRODUCTION_SERVICE'
+  | 'CNT_IP_LICENSE'
+  | 'OTHER_GENERAL';
 type FormulaCategory = 'A' | 'B' | 'C' | 'D' | 'E';
 type ResultType = '지혈 필요형' | '지원 의존형' | '마진 취약형' | '성장 준비형';
 type GcsStage = 'SURVIVE' | 'CASH' | 'GROW';
 
 type Answers = {
   // 1차 공통 (Q1~Q7)
-  industry?: Industry;
+  industry?: IndustryCategory;
+  industrySubcategory?: IndustrySubcategory;
   revenueSource?: RevenueSource;
+  businessModel?: BusinessModel;
   annualRevenue?: number;
   annualOperatingProfit?: number;
   cash?: number;
@@ -104,27 +167,168 @@ type Answers = {
  *  Part 2 — 업종 메타 (15개)
  * ==========================================================================*/
 
-const INDUSTRIES: { code: Industry; label: string; emoji: string; hint?: string }[] = [
-  { code: 'MFG_B2B',              label: '제조업 B2B',              emoji: '🏭', hint: '기업 대상 제조·부품·소재' },
-  { code: 'MFG_B2C',              label: '제조업 B2C (식품 등)',    emoji: '🥫', hint: '소비재·식음료 제조' },
-  { code: 'RETAIL',               label: '유통·도소매',             emoji: '🛒', hint: '온·오프라인 판매' },
-  { code: 'ECOMMERCE',            label: '이커머스·D2C',            emoji: '📦', hint: '자사몰·오픈마켓 판매' },
-  { code: 'IT',                   label: 'IT·SaaS',                 emoji: '💻', hint: '소프트웨어·플랫폼·앱' },
-  { code: 'EDUCATION',            label: '교육·강의',               emoji: '📚', hint: '온라인 강의·기업교육·아카데미' },
-  { code: 'CONSULTING',           label: '컨설팅·코칭',             emoji: '🧭', hint: '자문·코칭·프로젝트형 지식서비스' },
-  { code: 'CONTENT_MEDIA',        label: '콘텐츠·미디어',            emoji: '🎥', hint: '콘텐츠 판매·광고·구독 수익' },
-  { code: 'MEDICAL_GENERAL',      label: '의료 (일반 진료)',        emoji: '🏥', hint: '병의원·보험 진료' },
-  { code: 'MEDICAL_AESTHETIC',    label: '의료 (비급여·시술)',      emoji: '💉', hint: '피부·성형·한방 비급여' },
-  { code: 'BEAUTY',               label: '뷰티·라이프스타일',        emoji: '💄', hint: '화장품·뷰티 소매' },
-  { code: 'HEALTH_SERVICE',       label: '헬스케어 서비스',         emoji: '🧘', hint: 'PT·요가·필라테스 등' },
-  { code: 'HEALTH_PRODUCT',       label: '헬스케어 제품',           emoji: '💊', hint: '건강기능식품·보조제' },
-  { code: 'HEALTH_TECH',          label: '헬스케어 테크',           emoji: '📱', hint: '디지털헬스·의료기기' },
-  { code: 'REALESTATE_BROKERAGE', label: '부동산 중개·임대',        emoji: '🏠', hint: '중개·관리·임대업' },
-  { code: 'REALESTATE_DEV',       label: '부동산 개발·시행',        emoji: '🏗️', hint: '시행·분양·개발' },
-  { code: 'MARKETING_RETAINER',   label: '마케팅·광고 (리테이너)',  emoji: '📈', hint: '월정액 에이전시' },
-  { code: 'MARKETING_PROJECT',    label: '마케팅·광고 (프로젝트)',  emoji: '🎨', hint: '건별 수주 에이전시' },
-  { code: 'SERVICE',              label: '기타 서비스업',           emoji: '🛎️', hint: '위에 없는 업종' },
+const INDUSTRY_CATEGORIES: { code: IndustryCategory; label: string; emoji: string; hint?: string }[] = [
+  { code: 'DISTRIBUTION',     label: '유통·물류',         emoji: '🚚', hint: '도소매·이커머스·물류·배송' },
+  { code: 'MANUFACTURING',    label: '제조',              emoji: '🏭', hint: '생산·가공·OEM·부품' },
+  { code: 'IT_SOFTWARE',      label: 'IT·소프트웨어',      emoji: '💻', hint: 'SaaS·앱·플랫폼·개발' },
+  { code: 'EDU_CONSULTING',   label: '교육·컨설팅',        emoji: '📚', hint: '학원·강의·컨설팅·코칭' },
+  { code: 'SERVICE',          label: '서비스업',           emoji: '🛎️', hint: '음식·숙박·여행 등 대면 서비스' },
+  { code: 'BEAUTY_LIFESTYLE', label: '뷰티·라이프스타일',   emoji: '💆', hint: '미용·헬스·패션·웰니스' },
+  { code: 'HEALTHCARE',       label: '헬스케어·의료',      emoji: '🏥', hint: '병의원·의료기기·디지털 헬스' },
+  { code: 'MARKETING_AD',     label: '마케팅·광고',        emoji: '📣', hint: '대행사·에이전시·퍼포먼스' },
+  { code: 'CONSTRUCTION_RE',  label: '건설·부동산',        emoji: '🏗️', hint: '시공·인테리어·중개·임대' },
+  { code: 'FINANCE',          label: '금융·보험',          emoji: '💰', hint: '투자·대출·보험·핀테크' },
+  { code: 'CONTENT_MEDIA',    label: '콘텐츠·미디어',      emoji: '🎥', hint: '크리에이터·출판·방송' },
+  { code: 'OTHER',            label: '기타',              emoji: '✍️', hint: '해당 없음 (직접 입력)' },
 ];
+
+const INDUSTRY_SUBCATEGORIES: Partial<Record<IndustryCategory, { code: IndustrySubcategory; label: string; hint?: string }[]>> = {
+  DISTRIBUTION: [
+    { code: 'DST_ECOMMERCE', label: '온라인 쇼핑몰', hint: '자사몰·스마트스토어·쿠팡' },
+    { code: 'DST_OFFLINE', label: '오프라인 매장', hint: '매장 소매' },
+    { code: 'DST_WHOLESALE', label: 'B2B 도매·유통', hint: '도매·총판·유통' },
+    { code: 'DST_LOGISTICS', label: '물류·배송·창고', hint: '배송·풀필먼트' },
+  ],
+  MANUFACTURING: [
+    { code: 'MFG_CONSUMER', label: '소비재 제조', hint: '식품·생활용품·의류 생산' },
+    { code: 'MFG_INDUSTRIAL', label: '산업재·부품 제조', hint: '부품·소재·기계' },
+    { code: 'MFG_OEM', label: 'OEM·ODM', hint: '위탁생산' },
+    { code: 'MFG_AGRI_FOOD', label: '농수축산·식품가공', hint: '생산·가공·1차 산업' },
+  ],
+  IT_SOFTWARE: [
+    { code: 'IT_SAAS_B2B', label: 'B2B SaaS', hint: '기업용 소프트웨어' },
+    { code: 'IT_SAAS_B2C', label: 'B2C 앱·서비스', hint: '개인 대상 앱·구독' },
+    { code: 'IT_PLATFORM', label: '플랫폼·마켓플레이스', hint: '중개·매칭' },
+    { code: 'IT_SI_DEV', label: '수탁개발·SI', hint: '외주 개발·프로젝트' },
+    { code: 'IT_GAME', label: '게임', hint: '게임 개발·퍼블리싱' },
+    { code: 'IT_AI_DATA', label: 'AI·데이터', hint: 'AI 모델·데이터 분석' },
+  ],
+  EDU_CONSULTING: [
+    { code: 'EDU_ACADEMY', label: '학원·오프라인 교육', hint: '보습·입시·성인 학원' },
+    { code: 'EDU_ONLINE', label: '온라인 강의', hint: '인강·기수제 강의' },
+    { code: 'EDU_B2B_TRAINING', label: '기업교육', hint: '사내 교육·임직원 연수' },
+    { code: 'EDU_CONSULTING', label: '경영·전략 컨설팅', hint: '자문·코칭·컨설팅' },
+  ],
+  SERVICE: [
+    { code: 'SVC_F_AND_B', label: '음식점·카페', hint: '식당·카페·배달·프랜차이즈' },
+    { code: 'SVC_HOSPITALITY', label: '숙박·여행', hint: '호텔·펜션·여행사·투어' },
+    { code: 'SVC_PROFESSIONAL', label: '전문서비스', hint: '법무·세무·노무·회계' },
+    { code: 'SVC_WEDDING_EVENT', label: '웨딩·이벤트', hint: '웨딩·행사 기획·대행' },
+    { code: 'SVC_PET', label: '반려동물', hint: '펫샵·펫케어' },
+    { code: 'SVC_AUTO', label: '자동차', hint: '정비·딜러·세차' },
+    { code: 'SVC_ARTS', label: '예술·공연·엔터', hint: '공연·전시·기획사' },
+    { code: 'SVC_OTHER', label: '기타 서비스업', hint: '직접 입력' },
+  ],
+  BEAUTY_LIFESTYLE: [
+    { code: 'BTY_SALON', label: '미용실·네일·에스테틱', hint: '대면 미용 서비스' },
+    { code: 'BTY_FITNESS', label: '헬스장·필라테스·요가', hint: '피트니스·웰니스' },
+    { code: 'BTY_COSMETICS', label: '화장품·뷰티 제품', hint: '코스메틱 브랜드·판매' },
+    { code: 'BTY_FASHION', label: '패션·의류', hint: '의류 브랜드·쇼핑몰' },
+  ],
+  HEALTHCARE: [
+    { code: 'HC_INSURED', label: '보험진료 병의원', hint: '내과·소아과·가정의학과' },
+    { code: 'HC_ELECTIVE', label: '비급여·미용의료', hint: '피부과·성형외과·치과' },
+    { code: 'HC_DIGITAL', label: '디지털 헬스·헬스테크', hint: '헬스 앱·원격의료' },
+    { code: 'HC_DEVICE', label: '의료기기·의료용품', hint: '의료기기 제조·유통' },
+  ],
+  MARKETING_AD: [
+    { code: 'MKT_PERFORMANCE', label: '퍼포먼스 마케팅', hint: '광고 운영·미디어 바잉' },
+    { code: 'MKT_BRANDING', label: '브랜딩·종합 에이전시', hint: '브랜드 전략·캠페인' },
+    { code: 'MKT_DESIGN', label: '디자인·크리에이티브', hint: '스튜디오·제작사' },
+  ],
+  CONSTRUCTION_RE: [
+    { code: 'CON_BUILD', label: '건설·시공', hint: '종합건설·전문건설' },
+    { code: 'CON_INTERIOR', label: '인테리어·리모델링', hint: '시공·설계' },
+    { code: 'RE_BROKERAGE', label: '부동산 중개·임대', hint: '중개·임대·관리' },
+    { code: 'RE_DEVELOPMENT', label: '부동산 개발·분양', hint: '시행·분양' },
+  ],
+  FINANCE: [
+    { code: 'FIN_INVEST', label: '투자·자산운용', hint: 'VC·PE·자산운용' },
+    { code: 'FIN_LENDING', label: '대출·여신', hint: '대출·금융중개' },
+    { code: 'FIN_INSURANCE', label: '보험', hint: '보험 판매·설계' },
+    { code: 'FIN_FINTECH', label: '핀테크', hint: '간편결제·송금·블록체인' },
+  ],
+  CONTENT_MEDIA: [
+    { code: 'CNT_CREATOR', label: '크리에이터·1인 미디어', hint: '유튜브·블로그·인플루언서' },
+    { code: 'CNT_PUBLISHING', label: '출판·뉴스·미디어', hint: '출판·언론·뉴스레터' },
+    { code: 'CNT_PRODUCTION', label: '영상·제작사', hint: '영상 제작·프로덕션' },
+  ],
+};
+
+const BUSINESS_MODEL_OPTIONS: Partial<Record<IndustryCategory, { code: BusinessModel; label: string; hint: string; revenueSource?: RevenueSource[] }[]>> = {
+  DISTRIBUTION: [
+    { code: 'DIST_D2C', label: '자사몰·오픈마켓 판매 중심', hint: 'D2C·온라인 판매', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'DIST_RETAIL', label: '오프라인 매장 판매 중심', hint: '매장 소매·현장 결제', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'DIST_WHOLESALE', label: 'B2B 도매·납품 중심', hint: '총판·유통·기업 납품', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'DIST_LOGISTICS', label: '물류·배송 수수료 중심', hint: '풀필먼트·배송·창고', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+  ],
+  MANUFACTURING: [
+    { code: 'MFG_BRAND', label: '자체 브랜드 판매 중심', hint: '직접 제조 후 판매', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'MFG_OEM', label: 'OEM·ODM 수주 중심', hint: '위탁생산 매출', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'MFG_B2B_SUPPLY', label: '기업 납품 중심', hint: '부품·소재·기관 공급', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'MFG_RND_GOV', label: '정부 과제·R&D 병행', hint: '상용화 전후 과제형', revenueSource: ['MIX', 'GOV'] },
+  ],
+  IT_SOFTWARE: [
+    { code: 'IT_B2B_SUBSCRIPTION', label: 'B2B 구독형 매출 중심', hint: 'SaaS·라이선스', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'IT_B2C_SUBSCRIPTION', label: 'B2C 앱·구독 중심', hint: '앱 결제·멤버십', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'IT_PLATFORM_FEE', label: '중개·수수료 중심', hint: '플랫폼·결제 수수료', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'IT_PROJECT_BUILD', label: '구축·외주 개발 중심', hint: 'SI·프로젝트 매출', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'IT_AD_DATA', label: '광고·데이터 매출 중심', hint: '광고·데이터 판매', revenueSource: ['PRIVATE', 'MIX'] },
+  ],
+  EDU_CONSULTING: [
+    { code: 'EDU_B2C_CLASS', label: '개인 수강료 중심', hint: '학원·온라인 강의', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'EDU_B2B_TRAINING', label: '기업교육 중심', hint: '사내교육·연수', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'CONSULTING_PROJECT', label: '프로젝트형 자문 중심', hint: '건별 컨설팅', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'CONSULTING_RETAINER', label: '월정액 자문 중심', hint: '리테이너·코칭', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'EDU_VOUCHER_GOV', label: '바우처·정부지원 연계 중심', hint: '교육바우처·지원사업', revenueSource: ['MIX', 'GOV'] },
+  ],
+  SERVICE: [
+    { code: 'SVC_OFFLINE', label: '현장 대면 결제 중심', hint: '식음료·오프라인 서비스', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'SVC_BOOKING', label: '예약·숙박·티켓 매출 중심', hint: '여행·숙박·예매', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'SVC_B2B_CONTRACT', label: '기업·기관 계약 중심', hint: '전문서비스·B2B 계약', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'SVC_FRANCHISE_EVENT', label: '가맹·행사·프로젝트 중심', hint: '프랜차이즈·웨딩·이벤트', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+  ],
+  BEAUTY_LIFESTYLE: [
+    { code: 'BEAUTY_SERVICE', label: '대면 시술·서비스 중심', hint: '살롱·피트니스·웰니스', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'BEAUTY_MEMBERSHIP', label: '회원권·패키지 중심', hint: '정기권·패키지 결제', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'BEAUTY_PRODUCT', label: '제품 판매 중심', hint: '화장품·굿즈', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'BEAUTY_COMMERCE', label: '브랜드 커머스 중심', hint: '패션·온라인 판매', revenueSource: ['PRIVATE', 'MIX'] },
+  ],
+  HEALTHCARE: [
+    { code: 'HC_INSURED_REVENUE', label: '보험진료 중심', hint: '보험청구 매출', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'HC_ELECTIVE_REVENUE', label: '비급여·시술 중심', hint: '자비부담 시술', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'HC_B2B_INSTITUTION', label: '기관·병원 납품 중심', hint: 'B2B 의료 공급', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'HC_DIGITAL_SUBSCRIPTION', label: '디지털 헬스 구독 중심', hint: '앱·서비스 구독', revenueSource: ['PRIVATE', 'MIX', 'GOV'] },
+    { code: 'HC_DEVICE_SALES', label: '의료기기 판매 중심', hint: '기기·소모품 판매', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+  ],
+  MARKETING_AD: [
+    { code: 'MKT_MEDIA_BUYING', label: '광고 운영·매체 집행 중심', hint: '퍼포먼스 운영', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'MKT_PROJECT', label: '캠페인·프로젝트 중심', hint: '건별 수주', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'MKT_RETAINER', label: '월정액 운영 중심', hint: '리테이너 계약', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'MKT_CREATIVE_PRODUCTION', label: '디자인·제작 중심', hint: '콘텐츠·크리에이티브 제작', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+  ],
+  CONSTRUCTION_RE: [
+    { code: 'RE_CONSTRUCTION', label: '건설·시공 매출 중심', hint: '도급·하도급 공사', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'RE_INTERIOR', label: '인테리어·리모델링 중심', hint: '공간 시공·설계', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'RE_BROKERAGE_FEE', label: '중개 수수료 중심', hint: '중개·관리 수수료', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'RE_RENTAL_DEV', label: '임대·분양·개발 중심', hint: '임대수익·분양수익', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+  ],
+  FINANCE: [
+    { code: 'FIN_COMMISSION', label: '중개·보험 수수료 중심', hint: '판매·설계 수수료', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'FIN_SPREAD', label: '대출·여신 스프레드 중심', hint: '이자수익형', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'FIN_AUM', label: '운용자산 수수료 중심', hint: 'AUM·성과보수', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'FIN_FINTECH_FEE', label: '핀테크 거래 수수료 중심', hint: '결제·송금·플랫폼 수수료', revenueSource: ['PRIVATE', 'MIX', 'GOV'] },
+  ],
+  CONTENT_MEDIA: [
+    { code: 'CNT_AD_SPONSORSHIP', label: '광고·협찬 중심', hint: '브랜드 협찬·광고', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'CNT_PAID_SUBSCRIPTION', label: '유료 구독·멤버십 중심', hint: '구독·유료 콘텐츠', revenueSource: ['PRIVATE', 'MIX'] },
+    { code: 'CNT_PRODUCTION_SERVICE', label: '제작 외주 중심', hint: '영상·콘텐츠 제작 대행', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX'] },
+    { code: 'CNT_IP_LICENSE', label: 'IP·라이선스 중심', hint: '판권·라이선스 매출', revenueSource: ['PRIVATE', 'MIX'] },
+  ],
+  OTHER: [
+    { code: 'OTHER_GENERAL', label: '일반 서비스·판매형', hint: '추가 세부화 없이 진행', revenueSource: ['PRIVATE', 'PUBLIC', 'MIX', 'GOV'] },
+  ],
+};
 
 /* ============================================================================
  *  Part 3 — 한국은행 2024 벤치마크 (SME 우선)
@@ -159,27 +363,35 @@ const BENCHMARKS: Record<string, Benchmark> = {
                           note: '종합 평균은 대형 시설(카지노·리조트)이 끌어올린 값이라 중소기업 평균(4%대)이 현실에 가깝습니다.' },
 };
 
-function getBenchmark(industry: Industry): Benchmark {
-  const map: Record<Industry, keyof typeof BENCHMARKS> = {
-    MFG_B2B: 'MFG_ALL',
-    MFG_B2C: 'MFG_FOOD',
-    RETAIL: 'RETAIL_ALL',
-    ECOMMERCE: 'RETAIL_ALL',
-    IT: 'IT_SOFTWARE',
-    EDUCATION: 'PROF_SCI_TECH',
-    CONSULTING: 'PROF_SCI_TECH',
-    CONTENT_MEDIA: 'INFO_COMM',
-    MEDICAL_GENERAL: 'ARTS_SPORTS',
-    MEDICAL_AESTHETIC: 'ARTS_SPORTS',
-    BEAUTY: 'RETAIL_OFFLINE',
-    HEALTH_SERVICE: 'ARTS_SPORTS',
-    HEALTH_PRODUCT: 'MFG_PHARMA',
-    HEALTH_TECH: 'MFG_MEDICAL_DEVICE',
-    REALESTATE_BROKERAGE: 'REAL_ESTATE',
-    REALESTATE_DEV: 'REAL_ESTATE',
-    MARKETING_RETAINER: 'MARKETING_AD',
-    MARKETING_PROJECT: 'MARKETING_AD',
+function getBenchmark(industry?: IndustryCategory, subcategory?: IndustrySubcategory): Benchmark {
+  if (!industry) return BENCHMARKS.ALL;
+
+  if (subcategory === 'DST_OFFLINE') return BENCHMARKS.RETAIL_OFFLINE;
+  if (subcategory === 'DST_ECOMMERCE' || subcategory === 'DST_WHOLESALE' || subcategory === 'DST_LOGISTICS') return BENCHMARKS.RETAIL_ALL;
+  if (subcategory === 'MFG_CONSUMER' || subcategory === 'MFG_AGRI_FOOD') return BENCHMARKS.MFG_FOOD;
+  if (subcategory === 'MFG_INDUSTRIAL' || subcategory === 'MFG_OEM') return BENCHMARKS.MFG_ALL;
+  if (subcategory === 'SVC_PROFESSIONAL') return BENCHMARKS.PROF_SCI_TECH;
+  if (subcategory === 'SVC_ARTS') return BENCHMARKS.ARTS_SPORTS;
+  if (subcategory === 'BTY_COSMETICS' || subcategory === 'BTY_FASHION') return BENCHMARKS.RETAIL_OFFLINE;
+  if (subcategory === 'BTY_SALON' || subcategory === 'BTY_FITNESS') return BENCHMARKS.ARTS_SPORTS;
+  if (subcategory === 'HC_DEVICE') return BENCHMARKS.MFG_MEDICAL_DEVICE;
+  if (subcategory === 'HC_DIGITAL') return BENCHMARKS.INFO_COMM;
+  if (subcategory === 'HC_INSURED' || subcategory === 'HC_ELECTIVE') return BENCHMARKS.ARTS_SPORTS;
+  if (subcategory === 'RE_BROKERAGE' || subcategory === 'RE_DEVELOPMENT') return BENCHMARKS.REAL_ESTATE;
+
+  const map: Record<IndustryCategory, keyof typeof BENCHMARKS> = {
+    DISTRIBUTION: 'RETAIL_ALL',
+    MANUFACTURING: 'MFG_ALL',
+    IT_SOFTWARE: 'IT_SOFTWARE',
+    EDU_CONSULTING: 'PROF_SCI_TECH',
     SERVICE: 'ACCOM_FOOD',
+    BEAUTY_LIFESTYLE: 'ARTS_SPORTS',
+    HEALTHCARE: 'ARTS_SPORTS',
+    MARKETING_AD: 'MARKETING_AD',
+    CONSTRUCTION_RE: 'REAL_ESTATE',
+    FINANCE: 'ALL',
+    CONTENT_MEDIA: 'INFO_COMM',
+    OTHER: 'ALL',
   };
   return BENCHMARKS[map[industry]];
 }
@@ -210,6 +422,70 @@ function formatWon(value?: number | null) {
 function formatCount(value?: number | null, unit = '명') {
   if (value == null || Number.isNaN(value)) return '—';
   return `${value.toLocaleString('ko-KR')}${unit}`;
+}
+
+function formatSavedAt(value: string) {
+  const date = new Date(value);
+  const diff = Date.now() - date.getTime();
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < hour) {
+    const minutes = Math.max(1, Math.floor(diff / minute));
+    return `${minutes}분 전`;
+  }
+  if (diff < day) {
+    const hours = Math.max(1, Math.floor(diff / hour));
+    return `${hours}시간 전`;
+  }
+  if (diff < day * 7) {
+    const days = Math.max(1, Math.floor(diff / day));
+    return `${days}일 전`;
+  }
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+}
+
+function getIndustryMeta(industry?: string) {
+  return INDUSTRY_CATEGORIES.find((item) => item.code === industry);
+}
+
+function getIndustrySubcategoryMeta(category?: IndustryCategory, subcategory?: string) {
+  if (!category || !subcategory) return null;
+  return INDUSTRY_SUBCATEGORIES[category]?.find((item) => item.code === subcategory) ?? null;
+}
+
+function getIndustrySubcategoryOptions(category?: IndustryCategory) {
+  return category ? INDUSTRY_SUBCATEGORIES[category] ?? [] : [];
+}
+
+function needsIndustrySubcategory(category?: IndustryCategory) {
+  return getIndustrySubcategoryOptions(category).length > 0;
+}
+
+function getBusinessModelOptions(category?: IndustryCategory, revenueSource?: RevenueSource) {
+  if (!category) return [];
+  const options = BUSINESS_MODEL_OPTIONS[category] ?? [];
+  if (!revenueSource) return options;
+  return options.filter((item) => !item.revenueSource || item.revenueSource.includes(revenueSource));
+}
+
+function getBusinessModelMeta(category?: IndustryCategory, code?: BusinessModel) {
+  if (!category || !code) return null;
+  return (BUSINESS_MODEL_OPTIONS[category] ?? []).find((item) => item.code === code) ?? null;
+}
+
+function getResultTypeTone(type?: string) {
+  switch (type) {
+    case '성장 준비형':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    case '마진 취약형':
+      return 'border-amber-200 bg-amber-50 text-amber-700';
+    case '지원 의존형':
+      return 'border-sky-200 bg-sky-50 text-sky-700';
+    default:
+      return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
 }
 
 function toKoreanMoney(value?: number | null) {
@@ -481,15 +757,19 @@ function buildMetricGuide() {
   ];
 }
 
-function industryExtraQuestionCount(industry?: Industry) {
-  switch (industry) {
-    case 'EDUCATION':
+function industryExtraQuestionCount(subcategory?: IndustrySubcategory) {
+  switch (subcategory) {
+    case 'EDU_ACADEMY':
+    case 'EDU_ONLINE':
+    case 'EDU_B2B_TRAINING':
       return 4;
-    case 'CONSULTING':
+    case 'EDU_CONSULTING':
       return 3;
-    case 'ECOMMERCE':
+    case 'DST_ECOMMERCE':
       return 3;
-    case 'CONTENT_MEDIA':
+    case 'CNT_CREATOR':
+    case 'CNT_PUBLISHING':
+    case 'CNT_PRODUCTION':
       return 3;
     default:
       return 0;
@@ -497,23 +777,30 @@ function industryExtraQuestionCount(industry?: Industry) {
 }
 
 function buildIndustryContext(a: Answers, d: Derived) {
-  switch (a.industry) {
-    case 'EDUCATION':
+  const businessModelLabel = getBusinessModelMeta(a.industry, a.businessModel)?.label;
+  switch (a.industrySubcategory) {
+    case 'EDU_ACADEMY':
+    case 'EDU_ONLINE':
+    case 'EDU_B2B_TRAINING':
       return `재수강률 ${a.educationAnnualStudents && a.educationRepeatStudents ? `${((a.educationRepeatStudents / Math.max(1, a.educationAnnualStudents)) * 100).toFixed(1)}%` : '—'}, B2B 비중 ${a.educationB2BShare ?? '—'}%, 대표 직강 비중 ${a.educationFounderLedShare ?? '—'}%를 함께 보셔야 합니다.`;
-    case 'CONSULTING':
+    case 'EDU_CONSULTING':
       return `리테이너 비중 ${a.consultingRetainerShare ?? '—'}%, 대표 수행 비중 ${a.consultingFounderDeliveryShare ?? '—'}%, 확보된 파이프라인 ${a.consultingPipelineMonths ?? '—'}개월이 안정성을 좌우합니다.`;
-    case 'ECOMMERCE':
+    case 'DST_ECOMMERCE':
       return `최근 분기 광고비 ${formatWon(a.ecommerceAdSpendQuarter)}, 반품률 ${a.ecommerceReturnRate ?? '—'}%, 상위 SKU 집중도 ${a.ecommerceTopSkuShare ?? '—'}%가 실제 마진을 크게 흔듭니다.`;
-    case 'CONTENT_MEDIA':
+    case 'CNT_CREATOR':
+    case 'CNT_PUBLISHING':
+    case 'CNT_PRODUCTION':
       return `광고·협찬 비중 ${a.contentAdRevenueShare ?? '—'}%, 유료 전환율 ${a.contentPaidConversionRate ?? '—'}%, 상위 채널 의존도 ${a.contentChannelDependencyShare ?? '—'}%가 핵심입니다.`;
     default:
-      return d.growthSummary;
+      return [businessModelLabel ? `현재 선택한 매출 구조는 "${businessModelLabel}" 입니다.` : null, d.growthSummary].filter(Boolean).join(' ');
   }
 }
 
 function buildIndustryActionCard(a: Answers): ActionCard | null {
-  switch (a.industry) {
-    case 'EDUCATION':
+  switch (a.industrySubcategory) {
+    case 'EDU_ACADEMY':
+    case 'EDU_ONLINE':
+    case 'EDU_B2B_TRAINING':
       return {
         title: '재수강과 대표 의존도를 함께 점검하십시오',
         fact: `연 수강생 ${formatCount(a.educationAnnualStudents)}, 재수강 ${formatCount(a.educationRepeatStudents)}, 대표 직강 비중 ${a.educationFounderLedShare ?? '—'}%.`,
@@ -521,7 +808,7 @@ function buildIndustryActionCard(a: Answers): ActionCard | null {
         action: '재수강률이 높은 강의와 낮은 강의를 나누고, 대표 없이도 운영 가능한 강의 포맷을 1개 먼저 만드십시오.',
         checklist: ['강의별 재수강률 분리', '대표 비의존 강의 1개 선정', 'B2B 전환 가능 주제 검토'],
       };
-    case 'CONSULTING':
+    case 'EDU_CONSULTING':
       return {
         title: '리테이너 비중과 파이프라인 개월 수를 먼저 두껍게 하십시오',
         fact: `리테이너 비중 ${a.consultingRetainerShare ?? '—'}%, 파이프라인 ${a.consultingPipelineMonths ?? '—'}개월.`,
@@ -529,7 +816,7 @@ function buildIndustryActionCard(a: Answers): ActionCard | null {
         action: '프로젝트 고객 중 3곳을 골라 월정액 운영 제안으로 전환하고, 다음 분기 파이프라인을 월별로 수치화하십시오.',
         checklist: ['기존 고객 3곳 선정', '리테이너 제안안 작성', '월별 파이프라인 표 작성'],
       };
-    case 'ECOMMERCE':
+    case 'DST_ECOMMERCE':
       return {
         title: '매출보다 광고비와 반품률을 함께 보십시오',
         fact: `최근 분기 광고비 ${formatWon(a.ecommerceAdSpendQuarter)}, 반품률 ${a.ecommerceReturnRate ?? '—'}%, 상위 SKU 집중도 ${a.ecommerceTopSkuShare ?? '—'}%.`,
@@ -537,7 +824,9 @@ function buildIndustryActionCard(a: Answers): ActionCard | null {
         action: '광고비, 반품률, 상품별 매출 비중을 같은 표에 놓고 상위 상품 3개부터 공헌이익 기준으로 다시 보십시오.',
         checklist: ['상위 SKU 3개 공헌이익 계산', '반품률 상위 상품 확인', '광고 유지/중단 기준 정리'],
       };
-    case 'CONTENT_MEDIA':
+    case 'CNT_CREATOR':
+    case 'CNT_PUBLISHING':
+    case 'CNT_PRODUCTION':
       return {
         title: '광고 의존보다 유료 전환 구조를 키우십시오',
         fact: `광고·협찬 비중 ${a.contentAdRevenueShare ?? '—'}%, 유료 전환율 ${a.contentPaidConversionRate ?? '—'}%, 상위 채널 의존도 ${a.contentChannelDependencyShare ?? '—'}%.`,
@@ -855,7 +1144,7 @@ export default function Page() {
   const setA = <K extends keyof Answers>(k: K, v: Answers[K]) =>
     setAnswers((prev) => ({ ...prev, [k]: v }));
 
-  const bm = answers.industry ? getBenchmark(answers.industry) : BENCHMARKS.ALL;
+  const bm = getBenchmark(answers.industry, answers.industrySubcategory);
   const derived = useMemo(() => computeDerived(answers), [answers]);
   const mainType = useMemo(
     () => (answers.industry ? classify(answers, derived, bm) : null),
@@ -926,44 +1215,83 @@ export default function Page() {
                   <div className="text-xs text-stone-500">최근 진단 다시보기</div>
                   <div className="mt-1 text-sm font-medium text-stone-900">같은 기기에서는 로그인 없이 다시 볼 수 있습니다.</div>
                 </div>
-                <div className="mono text-xs text-stone-400">{savedResults.length} saved</div>
+                <div className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-stone-500">
+                  최근 {savedResults.length}건
+                </div>
               </div>
 
               {savedResults.length === 0 ? (
-                <p className="mt-4 text-sm leading-relaxed text-stone-500">
-                  아직 저장된 결과가 없습니다. 진단을 완료하면 최근 결과가 여기에 쌓입니다.
-                </p>
+                <div className="mt-4 rounded-[1.4rem] border border-dashed border-stone-200 bg-[#fcfaf7] p-4">
+                  <p className="text-sm leading-relaxed text-stone-500">
+                    아직 저장된 결과가 없습니다. 진단을 완료하면 최근 결과가 여기에 쌓입니다.
+                  </p>
+                </div>
               ) : (
                 <div className="mt-4 space-y-3">
                   {savedResults.slice(0, 5).map((item) => {
                     const input = item.input as Record<string, any>;
                     const dashboard = item.diagnosis?.dashboard ?? [];
-                    const firstMetric = dashboard[0];
+                    const resultType = item.diagnosis?.type as string | undefined;
+                    const industryMeta = getIndustryMeta(input.industry);
+                    const subcategoryMeta = getIndustrySubcategoryMeta(input.industry, input.industrySubcategory);
+                    const primaryMetrics = dashboard.slice(0, 2);
                     return (
-                      <div key={item.id} className="rounded-2xl border border-stone-200 bg-[#fffdf9] p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-medium text-stone-900">{input.industry ?? '업종 미상'}</div>
-                            <div className="mt-1 text-[11px] text-stone-500">{new Date(item.createdAt).toLocaleString('ko-KR')}</div>
-                            {firstMetric && (
-                              <div className="mt-2 text-xs leading-relaxed text-stone-600">
-                                {firstMetric.label}: {firstMetric.value}
+                      <div key={item.id} className="overflow-hidden rounded-[1.5rem] border border-stone-200 bg-[#fffdf9] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <div className="border-b border-stone-100 bg-[linear-gradient(135deg,rgba(250,246,239,0.96),rgba(255,255,255,0.9))] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{industryMeta?.emoji ?? '📄'}</span>
+                                <div className="text-sm font-semibold text-stone-900">
+                                  {subcategoryMeta?.label ?? industryMeta?.label ?? input.industry ?? '업종 미상'}
+                                </div>
+                              </div>
+                              <div className="mt-1 text-[11px] text-stone-500">
+                                {formatSavedAt(item.createdAt)} · {new Date(item.createdAt).toLocaleString('ko-KR')}
+                              </div>
+                            </div>
+                            {resultType && (
+                              <div className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${getResultTypeTone(resultType)}`}>
+                                {resultType}
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => {
-                              deleteSavedResult(item.id);
-                              setSavedResults(listSavedResults());
-                            }}
-                            className="text-xs text-stone-400 underline"
-                          >
-                            삭제
-                          </button>
                         </div>
-                        <Link href={`/result/${item.id}`} className="mt-3 inline-block text-xs font-medium text-stone-900 underline">
-                          다시보기
-                        </Link>
+
+                        <div className="p-4">
+                          <p className="text-sm leading-relaxed text-stone-700">
+                            {item.diagnosis?.headline?.asIs ?? '저장된 진단 결과를 다시 확인할 수 있습니다.'}
+                          </p>
+
+                          {primaryMetrics.length > 0 && (
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                              {primaryMetrics.map((metric: { label: string; value: string }) => (
+                                <div key={metric.label} className="rounded-2xl border border-stone-200 bg-white px-3 py-2.5">
+                                  <div className="text-[11px] text-stone-500">{metric.label}</div>
+                                  <div className="mono mt-1 text-sm font-semibold text-stone-900">{metric.value}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex items-center justify-between gap-3">
+                            <button
+                              onClick={() => {
+                                deleteSavedResult(item.id);
+                                setSavedResults(listSavedResults());
+                              }}
+                              className="text-xs text-stone-400 underline underline-offset-2 transition hover:text-stone-600"
+                            >
+                              삭제
+                            </button>
+                            <Link
+                              href={`/result/${item.id}`}
+                              className="inline-flex items-center rounded-full bg-stone-900 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-stone-700"
+                            >
+                              결과 다시보기
+                            </Link>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -1012,7 +1340,9 @@ function Brand() {
 }
 
 function totalSteps(a: Answers): number {
-  let base = 13 + industryExtraQuestionCount(a.industry); // 공통 12문항 + 공식 선택 1 + 업종추가질문
+  let base = 13 + industryExtraQuestionCount(a.industrySubcategory); // 공통 12문항 + 공식 선택 1 + 업종추가질문
+  if (needsIndustrySubcategory(a.industry)) base += 1;
+  if (getBusinessModelOptions(a.industry, a.revenueSource).length > 0) base += 1;
   if (a.primaryFormula === 'A' || a.primaryFormula === 'B') base += 3;
   if (a.primaryFormula === 'C') base += 2;
   if (a.primaryFormula === 'D') base += 2;
@@ -1052,6 +1382,11 @@ function StepView(props: {
 }) {
   const { step, answers, setA, onNext, onPrev, onFinish } = props;
   const a = answers;
+  const hasIndustrySubcategory = needsIndustrySubcategory(a.industry);
+  const businessModelOptions = getBusinessModelOptions(a.industry, a.revenueSource);
+  const hasBusinessModelQuestion = businessModelOptions.length > 0;
+  const commonQuestionOffset = (hasIndustrySubcategory ? 1 : 0) + (hasBusinessModelQuestion ? 1 : 0);
+  const formulaQuestionStart = 14 + commonQuestionOffset;
 
   // 질문 리스트를 동적으로 구성
   const questions: (() => React.ReactNode)[] = [];
@@ -1060,15 +1395,19 @@ function StepView(props: {
   questions.push(() => (
     <Question
       num={1}
-      title="대표님 회사의 업종은 무엇일까요?"
-      subtitle="가장 가까운 하나를 골라주시면 됩니다."
+      title="대표님 회사의 1차 업종 카테고리는 무엇일까요?"
+      subtitle="먼저 큰 분류를 고르면, 필요한 경우에만 세부 업종을 한 번 더 여쭙겠습니다."
     >
       <div className="grid grid-cols-2 gap-2">
-        {INDUSTRIES.map((ind) => (
+        {INDUSTRY_CATEGORIES.map((ind) => (
           <PillSelect
             key={ind.code}
             active={a.industry === ind.code}
-            onClick={() => setA('industry', ind.code)}
+            onClick={() => {
+              setA('industry', ind.code);
+              setA('industrySubcategory', undefined);
+              setA('businessModel', undefined);
+            }}
           >
             <div className="flex items-start gap-2">
               <span className="text-lg">{ind.emoji}</span>
@@ -1084,10 +1423,35 @@ function StepView(props: {
     </Question>
   ));
 
+  if (needsIndustrySubcategory(a.industry)) {
+    const subcategoryOptions = getIndustrySubcategoryOptions(a.industry);
+    questions.push(() => (
+      <Question
+        num={2}
+        title="세부 업종은 어디에 더 가깝습니까?"
+        subtitle="이 답변에 따라 뒤의 업종 맞춤 질문과 결과 문장이 더 뾰족해집니다."
+      >
+        <div className="space-y-2">
+          {subcategoryOptions.map((item) => (
+            <PillSelect
+              key={item.code}
+              active={a.industrySubcategory === item.code}
+              onClick={() => setA('industrySubcategory', item.code)}
+            >
+              <div className="text-sm font-medium">{item.label}</div>
+              {item.hint && <div className="mt-0.5 text-xs text-stone-500">{item.hint}</div>}
+            </PillSelect>
+          ))}
+        </div>
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={!!a.industrySubcategory} />
+      </Question>
+    ));
+  }
+
   // Q2. 매출 유형
   questions.push(() => (
     <Question
-      num={2}
+      num={hasIndustrySubcategory ? 3 : 2}
       title="매출은 주로 어디서 나올까요?"
       subtitle="가장 큰 매출원을 골라주시면 됩니다."
     >
@@ -1101,7 +1465,10 @@ function StepView(props: {
           <PillSelect
             key={o.code}
             active={a.revenueSource === o.code}
-            onClick={() => setA('revenueSource', o.code as RevenueSource)}
+            onClick={() => {
+              setA('revenueSource', o.code as RevenueSource);
+              setA('businessModel', undefined);
+            }}
           >
             <div className="text-sm font-medium">{o.label}</div>
             <div className="mt-0.5 text-xs text-stone-500">{o.hint}</div>
@@ -1112,9 +1479,33 @@ function StepView(props: {
     </Question>
   ));
 
+  if (hasBusinessModelQuestion) {
+    questions.push(() => (
+      <Question
+        num={hasIndustrySubcategory ? 4 : 3}
+        title="이 업종에서 매출이 생기는 방식은 어디에 더 가깝습니까?"
+        subtitle="공통 재무 성격 분류와 별개로, 실제 사업모델에 가까운 구조를 골라주세요."
+      >
+        <div className="space-y-2">
+          {businessModelOptions.map((item) => (
+            <PillSelect
+              key={item.code}
+              active={a.businessModel === item.code}
+              onClick={() => setA('businessModel', item.code)}
+            >
+              <div className="text-sm font-medium">{item.label}</div>
+              <div className="mt-0.5 text-xs text-stone-500">{item.hint}</div>
+            </PillSelect>
+          ))}
+        </div>
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={!!a.businessModel} />
+      </Question>
+    ));
+  }
+
   // Q3. 최근 12개월 매출
   questions.push(() => (
-    <Question num={3} title="최근 12개월 매출은 얼마입니까?" subtitle="직전 12개월 합계로 적어주셔도 좋고, 2025년 연간 매출을 대신 넣으셔도 됩니다.">
+    <Question num={3 + commonQuestionOffset} title="최근 12개월 매출은 얼마입니까?" subtitle="직전 12개월 합계로 적어주셔도 좋고, 2025년 연간 매출을 대신 넣으셔도 됩니다.">
       <NumInput
         value={a.annualRevenue}
         onChange={(v) => setA('annualRevenue', v)}
@@ -1127,7 +1518,7 @@ function StepView(props: {
 
   // Q4. 최근 12개월 영업이익
   questions.push(() => (
-    <Question num={4} title="직전 입력한 12개월 영업이익은 얼마입니까?" subtitle="적자면 마이너스까지 포함해 입력해주세요.">
+    <Question num={4 + commonQuestionOffset} title="직전 입력한 12개월 영업이익은 얼마입니까?" subtitle="적자면 마이너스까지 포함해 입력해주세요.">
       <NumInput
         value={a.annualOperatingProfit}
         onChange={(v) => setA('annualOperatingProfit', v)}
@@ -1141,7 +1532,7 @@ function StepView(props: {
 
   // Q5. 현금
   questions.push(() => (
-    <Question num={5} title="지금 바로 사용 가능한 현금은 얼마입니까?" subtitle="통장 잔액 기준이면 충분합니다.">
+    <Question num={5 + commonQuestionOffset} title="지금 바로 사용 가능한 현금은 얼마입니까?" subtitle="통장 잔액 기준이면 충분합니다.">
       <NumInput
         value={a.cash}
         onChange={(v) => setA('cash', v)}
@@ -1154,7 +1545,7 @@ function StepView(props: {
 
   // Q6. 최근 12개월 총 인건비
   questions.push(() => (
-    <Question num={6} title="최근 12개월 총 인건비는 얼마입니까?" subtitle="급여 + 상여 + 4대보험 회사부담분까지 포함한 총액으로 적어주세요.">
+    <Question num={6 + commonQuestionOffset} title="최근 12개월 총 인건비는 얼마입니까?" subtitle="급여 + 상여 + 4대보험 회사부담분까지 포함한 총액으로 적어주세요.">
       <NumInput
         value={a.annualLaborCost}
         onChange={(v) => setA('annualLaborCost', v)}
@@ -1167,7 +1558,7 @@ function StepView(props: {
 
   // Q7. 월 고정비(인건비 제외)
   questions.push(() => (
-    <Question num={7} title="월 고정비는 얼마입니까?" subtitle="인건비는 제외하고, 임대료·구독료·관리비 등 매달 반복되는 비용만 적어주세요.">
+    <Question num={7 + commonQuestionOffset} title="월 고정비는 얼마입니까?" subtitle="인건비는 제외하고, 임대료·구독료·관리비 등 매달 반복되는 비용만 적어주세요.">
       <NumInput
         value={a.monthlyFixedCost}
         onChange={(v) => setA('monthlyFixedCost', v)}
@@ -1180,7 +1571,7 @@ function StepView(props: {
 
   // Q8. 인원수
   questions.push(() => (
-    <Question num={8} title="정규 인원은 몇 명입니까?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
+    <Question num={8 + commonQuestionOffset} title="정규 인원은 몇 명입니까?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
       <NumInput
         value={a.headcount}
         onChange={(v) => setA('headcount', v)}
@@ -1193,25 +1584,25 @@ function StepView(props: {
 
   // Q9~Q12. 최근 분기 흐름
   questions.push(() => (
-    <Question num={9} title="최근 완료된 분기 매출은 얼마입니까?" subtitle="예: 2026년 1분기 매출">
+    <Question num={9 + commonQuestionOffset} title="최근 완료된 분기 매출은 얼마입니까?" subtitle="예: 2026년 1분기 매출">
       <NumInput value={a.latestQuarterRevenue} onChange={(v) => setA('latestQuarterRevenue', v)} unit="원" placeholder="예: 90,000,000" />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.latestQuarterRevenue != null && a.latestQuarterRevenue > 0} />
     </Question>
   ));
   questions.push(() => (
-    <Question num={10} title="최근 완료된 분기 영업이익은 얼마입니까?" subtitle="예: 2026년 1분기 영업이익">
+    <Question num={10 + commonQuestionOffset} title="최근 완료된 분기 영업이익은 얼마입니까?" subtitle="예: 2026년 1분기 영업이익">
       <NumInput value={a.latestQuarterOperatingProfit} onChange={(v) => setA('latestQuarterOperatingProfit', v)} unit="원" allowNegative placeholder="예: -5,000,000" />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.latestQuarterOperatingProfit != null} />
     </Question>
   ));
   questions.push(() => (
-    <Question num={11} title="그 직전 분기 매출은 얼마입니까?" subtitle="예: 2025년 4분기 매출">
+    <Question num={11 + commonQuestionOffset} title="그 직전 분기 매출은 얼마입니까?" subtitle="예: 2025년 4분기 매출">
       <NumInput value={a.previousQuarterRevenue} onChange={(v) => setA('previousQuarterRevenue', v)} unit="원" placeholder="예: 80,000,000" />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.previousQuarterRevenue != null && a.previousQuarterRevenue > 0} />
     </Question>
   ));
   questions.push(() => (
-    <Question num={12} title="그 직전 분기 영업이익은 얼마입니까?" subtitle="예: 2025년 4분기 영업이익">
+    <Question num={12 + commonQuestionOffset} title="그 직전 분기 영업이익은 얼마입니까?" subtitle="예: 2025년 4분기 영업이익">
       <NumInput value={a.previousQuarterOperatingProfit} onChange={(v) => setA('previousQuarterOperatingProfit', v)} unit="원" allowNegative placeholder="예: 8,000,000" />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.previousQuarterOperatingProfit != null} />
     </Question>
@@ -1220,7 +1611,7 @@ function StepView(props: {
   // Q13. 매출 공식
   questions.push(() => (
     <Question
-      num={13}
+      num={13 + commonQuestionOffset}
       title="우리 회사 매출이 가장 크게 움직이는 축은 무엇일까요?"
       subtitle="하나를 골라주시면 이후 질문이 맞춤으로 바뀝니다."
     >
@@ -1249,77 +1640,77 @@ function StepView(props: {
   // 공식별 분기 질문
   if (a.primaryFormula === 'A') {
     questions.push(() => (
-      <Question num={14} title="지난 3개월간 한 번이라도 결제한 고객은 몇 명입니까?" subtitle="대략이어도 괜찮습니다.">
+      <Question num={formulaQuestionStart} title="지난 3개월간 한 번이라도 결제한 고객은 몇 명입니까?" subtitle="대략이어도 괜찮습니다.">
         <NumInput value={a.activeCustomers3m} onChange={(v) => setA('activeCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeCustomers3m != null && a.activeCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={15} title="그중 2회 이상 결제한 고객은 몇 명입니까?" subtitle="재구매율을 자동 계산합니다.">
+      <Question num={formulaQuestionStart + 1} title="그중 2회 이상 결제한 고객은 몇 명입니까?" subtitle="재구매율을 자동 계산합니다.">
         <NumInput value={a.repeatCustomers3m} onChange={(v) => setA('repeatCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.repeatCustomers3m != null && a.repeatCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={16} title="평균 1회 결제 금액은 얼마입니까?">
+      <Question num={formulaQuestionStart + 2} title="평균 1회 결제 금액은 얼마입니까?">
         <NumInput value={a.avgOrderValue} onChange={(v) => setA('avgOrderValue', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgOrderValue != null && a.avgOrderValue >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'B') {
     questions.push(() => (
-      <Question num={14} title="지난달 신규 상담·가입·문의는 몇 건입니까?">
+      <Question num={formulaQuestionStart} title="지난달 신규 상담·가입·문의는 몇 건입니까?">
         <NumInput value={a.newLeadsLastMonth} onChange={(v) => setA('newLeadsLastMonth', v)} unit="건" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newLeadsLastMonth != null && a.newLeadsLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={15} title="그중 유료 전환된 고객은 몇 명입니까?">
+      <Question num={formulaQuestionStart + 1} title="그중 유료 전환된 고객은 몇 명입니까?">
         <NumInput value={a.newPaidLastMonth} onChange={(v) => setA('newPaidLastMonth', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newPaidLastMonth != null && a.newPaidLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={16} title="신규 고객 평균 결제 금액은 얼마입니까?">
+      <Question num={formulaQuestionStart + 2} title="신규 고객 평균 결제 금액은 얼마입니까?">
         <NumInput value={a.newCustomerAOV} onChange={(v) => setA('newCustomerAOV', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newCustomerAOV != null && a.newCustomerAOV >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'C') {
     questions.push(() => (
-      <Question num={14} title="지난 1년 누적 고객은 대략 몇 명입니까?">
+      <Question num={formulaQuestionStart} title="지난 1년 누적 고객은 대략 몇 명입니까?">
         <NumInput value={a.annualCustomers} onChange={(v) => setA('annualCustomers', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualCustomers != null && a.annualCustomers >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={15} title="평균 객단가는 얼마입니까?">
+      <Question num={formulaQuestionStart + 1} title="평균 객단가는 얼마입니까?">
         <NumInput value={a.avgTicket} onChange={(v) => setA('avgTicket', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgTicket != null && a.avgTicket >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'D') {
     questions.push(() => (
-      <Question num={14} title="현재 매출이 발생하는 거래처는 몇 개입니까?">
+      <Question num={formulaQuestionStart} title="현재 매출이 발생하는 거래처는 몇 개입니까?">
         <NumInput value={a.activeAccounts} onChange={(v) => setA('activeAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeAccounts != null && a.activeAccounts >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={15} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개입니까?" subtitle="재계약률을 자동 계산합니다.">
+      <Question num={formulaQuestionStart + 1} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개입니까?" subtitle="재계약률을 자동 계산합니다.">
         <NumInput value={a.retainedAccounts} onChange={(v) => setA('retainedAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.retainedAccounts != null && a.retainedAccounts >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'E') {
     questions.push(() => (
-      <Question num={14} title="매출을 만드는 핵심 인력은 몇 명입니까?">
+      <Question num={formulaQuestionStart} title="매출을 만드는 핵심 인력은 몇 명입니까?">
         <NumInput value={a.coreStaffCount} onChange={(v) => setA('coreStaffCount', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.coreStaffCount != null && a.coreStaffCount >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={15} title="이 인력의 현재 가동 상태는 어떠합니까?">
+      <Question num={formulaQuestionStart + 1} title="이 인력의 현재 가동 상태는 어떠합니까?">
         <div className="space-y-2">
           {[
             { code: 'SLACK', label: '여유 있음', hint: '일이 부족함' },
@@ -1340,14 +1731,14 @@ function StepView(props: {
       </Question>
     ));
     questions.push(() => (
-      <Question num={16} title="시간당 또는 일당 단가는 얼마입니까?">
+      <Question num={formulaQuestionStart + 2} title="시간당 또는 일당 단가는 얼마입니까?">
         <NumInput value={a.hourlyRate} onChange={(v) => setA('hourlyRate', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.hourlyRate != null && a.hourlyRate >= 0} />
       </Question>
     ));
   }
 
-  if (a.industry === 'EDUCATION') {
+  if (a.industrySubcategory === 'EDU_ACADEMY' || a.industrySubcategory === 'EDU_ONLINE' || a.industrySubcategory === 'EDU_B2B_TRAINING') {
     questions.push(() => (
       <Question title="최근 12개월 수강생은 몇 명입니까?" subtitle="무료 체험 제외, 실제 결제한 수강생 기준입니다.">
         <NumInput value={a.educationAnnualStudents} onChange={(v) => setA('educationAnnualStudents', v)} unit="명" />
@@ -1372,7 +1763,7 @@ function StepView(props: {
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.educationFounderLedShare != null && a.educationFounderLedShare >= 0} />
       </Question>
     ));
-  } else if (a.industry === 'CONSULTING') {
+  } else if (a.industrySubcategory === 'EDU_CONSULTING') {
     questions.push(() => (
       <Question title="리테이너·월정액 매출 비중은 몇 %입니까?">
         <NumInput value={a.consultingRetainerShare} onChange={(v) => setA('consultingRetainerShare', v)} unit="%" />
@@ -1391,7 +1782,7 @@ function StepView(props: {
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.consultingPipelineMonths != null && a.consultingPipelineMonths >= 0} />
       </Question>
     ));
-  } else if (a.industry === 'ECOMMERCE') {
+  } else if (a.industrySubcategory === 'DST_ECOMMERCE') {
     questions.push(() => (
       <Question title="최근 완료된 분기 광고비는 얼마입니까?">
         <NumInput value={a.ecommerceAdSpendQuarter} onChange={(v) => setA('ecommerceAdSpendQuarter', v)} unit="원" />
@@ -1410,7 +1801,7 @@ function StepView(props: {
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.ecommerceTopSkuShare != null && a.ecommerceTopSkuShare >= 0} />
       </Question>
     ));
-  } else if (a.industry === 'CONTENT_MEDIA') {
+  } else if (a.industrySubcategory === 'CNT_CREATOR' || a.industrySubcategory === 'CNT_PUBLISHING' || a.industrySubcategory === 'CNT_PRODUCTION') {
     questions.push(() => (
       <Question title="광고·협찬 매출 비중은 몇 %입니까?">
         <NumInput value={a.contentAdRevenueShare} onChange={(v) => setA('contentAdRevenueShare', v)} unit="%" />
@@ -1634,7 +2025,7 @@ function Footer() {
   return (
     <div className="mt-12 border-t border-stone-200 pt-6">
       <p className="text-xs text-stone-500">
-        원자료만 입력하시면 영업이익률·런웨이·HCROI 등은 앱이 자동 계산합니다. 저장되지 않으며 새로 고침하면 초기화됩니다.
+        원자료만 입력하시면 영업이익률·런웨이·HCROI 등은 앱이 자동 계산합니다. 최근 결과는 같은 기기 브라우저에 저장되어 다시보기가 가능합니다.
       </p>
     </div>
   );

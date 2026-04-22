@@ -155,8 +155,53 @@ function getBenchmark(industry: Industry): Benchmark {
  *  Part 4 — 파생지표 계산 (computeDerived)
  * ==========================================================================*/
 
-const ESTIMATED_LABOR_COST_PER_HEAD = 6000; // 만원
+const ESTIMATED_LABOR_COST_PER_HEAD = 60000000; // 원
 const SME_HEADCOUNT_THRESHOLD = 300;
+
+const KOREAN_NUMBER_UNITS = [
+  { value: 1000000000000, label: '조' },
+  { value: 100000000, label: '억' },
+  { value: 10000, label: '만' },
+];
+
+function formatNumber(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return '';
+  return value.toLocaleString('ko-KR');
+}
+
+function formatWon(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return '—';
+  return `${value.toLocaleString('ko-KR')}원`;
+}
+
+function formatCount(value?: number | null, unit = '명') {
+  if (value == null || Number.isNaN(value)) return '—';
+  return `${value.toLocaleString('ko-KR')}${unit}`;
+}
+
+function toKoreanMoney(value?: number | null) {
+  if (value == null || Number.isNaN(value)) return '';
+
+  const abs = Math.abs(Math.trunc(value));
+  if (abs === 0) return '영 원';
+
+  let remaining = abs;
+  const parts: string[] = [];
+
+  for (const unit of KOREAN_NUMBER_UNITS) {
+    const chunk = Math.floor(remaining / unit.value);
+    if (chunk > 0) {
+      parts.push(`${chunk.toLocaleString('ko-KR')}${unit.label}`);
+      remaining %= unit.value;
+    }
+  }
+
+  if (remaining > 0) {
+    parts.push(remaining.toLocaleString('ko-KR'));
+  }
+
+  return `${value < 0 ? '마이너스 ' : ''}${parts.join(' ')}원`;
+}
 
 type Derived = {
   operatingMargin: number | null;
@@ -253,7 +298,7 @@ function classify(a: Answers, d: Derived, bm: Benchmark): ResultType {
   if (a.revenueSource === 'PUBLIC' && a.nextPublicDeal === 'NONE') return '지원 의존형';
 
   // 마진 취약형 — 업종 SME 평균 대비 판정
-  if (d.operatingMargin != null && d.operatingMargin < bmMargin - 2 && (a.annualRevenue ?? 0) >= 10000) {
+  if (d.operatingMargin != null && d.operatingMargin < bmMargin - 2 && (a.annualRevenue ?? 0) >= 100000000) {
     return '마진 취약형';
   }
 
@@ -285,16 +330,17 @@ type Diagnosis = {
 };
 
 function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): Diagnosis {
-  const fmtNum = (v: number | null, unit = '') => v == null ? '—' : `${v}${unit}`;
   const bmMargin = d.isSME ? bm.operatingMarginSME : bm.operatingMarginSME; // SME 기본 노출
-  const bmLabel = d.isSME ? `${bm.label} 중소기업 평균` : `${bm.label} 평균`;
+  const marginLabel = d.operatingMargin != null ? `${d.operatingMargin}%` : '—';
+  const runwayLabel = d.runwayMonths != null ? `${d.runwayMonths}개월` : '—';
+  const dependencyLabel = d.govDependency != null ? `${d.govDependency}%` : null;
 
   // ── 1. 헤드라인 (As-is / To-be) ──
   const asIsMap: Record<ResultType, string> = {
-    '지혈 필요형': '지금은 매출·이익보다 현금 방어가 우선인 단계입니다.',
-    '지원 의존형': '자체 매출 기반이 아직 약하고 외부 지원에 크게 기대고 있는 단계입니다.',
-    '마진 취약형': '매출은 나오고 있지만 이익이 새고 있는 단계입니다.',
-    '성장 준비형': '생존 걱정은 없고 다음 성장의 우선순위를 정할 단계입니다.',
+    '지혈 필요형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}로 지금은 성장이 아니라 현금 방어가 먼저입니다.`,
+    '지원 의존형': `영업이익률 ${marginLabel}, 지원 의존도 ${dependencyLabel ?? '—'}로 자체 매출 기반을 더 두껍게 만들어야 하는 구간입니다.`,
+    '마진 취약형': `현금 런웨이 ${runwayLabel}는 버티고 있지만 영업이익률 ${marginLabel}로 남는 구조를 다시 짜야 합니다.`,
+    '성장 준비형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}로 기본 체력은 확보됐고 이제 성장 레버를 고를 차례입니다.`,
   };
   const toBeMap: Record<ResultType, string> = {
     '지혈 필요형': '3개월 안에 런웨이 6개월 이상 확보하는 게 목표입니다.',
@@ -423,7 +469,7 @@ function buildActions(a: Answers, d: Derived, bm: Benchmark, t: ResultType): Act
   if (t === '지혈 필요형') {
     cards.push({
       title: '이번 주에 현금 30일치를 별도 계좌로 분리하십시오',
-      fact: `현재 런웨이 ${d.runwayMonths ?? '—'}개월. 월 고정비 ${a.monthlyFixedCost?.toLocaleString() ?? '—'}만원.`,
+      fact: `현재 런웨이 ${d.runwayMonths ?? '—'}개월. 월 고정비 ${formatWon(a.monthlyFixedCost)}.`,
       insight: '런웨이가 짧을 때 가장 먼저 무너지는 건 심리입니다. 총 잔액을 매일 보면 판단력이 떨어집니다. 운영 계좌와 방어 계좌를 물리적으로 분리하면 남은 자원으로 무엇을 할지 차분하게 결정할 수 있습니다.',
       action: '오늘 안에 별도 계좌를 하나 개설하고, 월 고정비 1개월치를 이체하십시오. 이 계좌 카드는 평상시 쓰지 않습니다.',
       checklist: ['별도 계좌 개설', '월 고정비 1개월치 이체', '카드 지갑에서 분리'],
@@ -475,7 +521,7 @@ function buildActions(a: Answers, d: Derived, bm: Benchmark, t: ResultType): Act
   } else if (a.primaryFormula === 'C') {
     cards.push({
       title: '객단가 10% 인상 후보군을 찾으십시오',
-      fact: `연 누적 고객 ${a.annualCustomers ?? '—'}명, 평균 객단가 ${a.avgTicket ?? '—'}만원.`,
+      fact: `연 누적 고객 ${formatCount(a.annualCustomers)}, 평균 객단가 ${formatWon(a.avgTicket)}.`,
       insight: '객단가 10% 인상은 영업이익에 단순 계산보다 훨씬 크게 기여합니다. 고정비가 그대로이기 때문입니다. 다만 기존 고객 전원 인상은 저항이 크므로 프리미엄 옵션 추가 방식이 안전합니다.',
       action: '지난 1년 결제 고객을 결제 횟수순으로 정렬해 상위 20%에게 "프리미엄 옵션" 을 시범 제안하십시오. 2주간 전환율을 측정하면 인상 가능성이 보입니다.',
       checklist: ['상위 20% 고객 명단 추출', '프리미엄 옵션 3개 기획', '10건 이상 시범 제안'],
@@ -588,7 +634,7 @@ function buildDashboard(a: Answers, d: Derived, bm: Benchmark) {
 
   arr.push({
     label: '인당 매출',
-    value: d.revenuePerHead != null ? `${d.revenuePerHead.toLocaleString()}만원` : '—',
+    value: d.revenuePerHead != null ? formatWon(d.revenuePerHead) : '—',
     note: '업종별 편차가 커서 평균 제시 안 함. 지난 분기 대비 추세로 판단',
   });
 
@@ -640,18 +686,44 @@ export default function Page() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-xl px-6 py-10">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <Brand />
-        <StepIndicator step={step} total={totalSteps(answers)} />
-        <div className="mt-8">
-          <StepView
-            step={step}
-            answers={answers}
-            setA={setA}
-            onNext={() => setStep((s) => s + 1)}
-            onPrev={() => setStep((s) => Math.max(0, s - 1))}
-            onFinish={() => setShowResult(true)}
-          />
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_20px_60px_rgba(28,25,23,0.08)] backdrop-blur sm:p-8">
+            <StepIndicator step={step} total={totalSteps(answers)} />
+            <div className="mt-8">
+              <StepView
+                step={step}
+                answers={answers}
+                setA={setA}
+                onNext={() => setStep((s) => s + 1)}
+                onPrev={() => setStep((s) => Math.max(0, s - 1))}
+                onFinish={() => setShowResult(true)}
+              />
+            </div>
+          </div>
+          <aside className="rounded-[2rem] border border-[#eadfce] bg-[#fbf7f2] p-6 shadow-[0_20px_50px_rgba(28,25,23,0.06)]">
+            <div className="mono text-[11px] uppercase tracking-[0.24em] text-stone-400">Preview</div>
+            <h3 className="mt-3 text-lg font-semibold leading-snug">숫자를 넣으면 바로 대표용 결과지로 정리됩니다.</h3>
+            <p className="mt-2 text-sm leading-relaxed text-stone-600">
+              입력 중에도 핵심 숫자가 어떻게 쌓이는지 한눈에 보이도록 카드형 레이아웃으로 구성했습니다.
+            </p>
+            <div className="mt-6 rounded-[1.6rem] border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="rounded-[1.3rem] border border-stone-200 bg-[#fffaf3] p-4">
+                <div className="text-xs text-stone-500">현재 계산 미리보기</div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-stone-900 p-3 text-white">
+                    <div className="text-[11px] text-stone-300">영업이익률</div>
+                    <div className="mt-1 text-lg font-semibold">{derived.operatingMargin != null ? `${derived.operatingMargin}%` : '—'}</div>
+                  </div>
+                  <div className="rounded-2xl border border-stone-200 bg-white p-3">
+                    <div className="text-[11px] text-stone-500">현금 런웨이</div>
+                    <div className="mt-1 text-lg font-semibold">{derived.runwayMonths != null ? `${derived.runwayMonths}개월` : '—'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
         <Footer />
       </div>
@@ -661,13 +733,18 @@ export default function Page() {
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900" style={{ fontFamily: '"Noto Serif KR", "IBM Plex Serif", serif' }}>
+    <div className="min-h-screen bg-[#f6f1ea] text-stone-900" style={{ fontFamily: '"Noto Serif KR", "IBM Plex Serif", serif' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
         body { -webkit-font-smoothing: antialiased; }
         .mono { font-family: 'IBM Plex Mono', monospace; }
       `}</style>
-      {children}
+      <div className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(246,241,234,0.45)_48%,_transparent_72%)]" />
+        <div className="pointer-events-none absolute -left-16 top-52 h-72 w-72 rounded-full bg-white/70 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 top-12 h-72 w-72 rounded-full bg-[#f7c78b]/30 blur-3xl" />
+        {children}
+      </div>
     </div>
   );
 }
@@ -675,12 +752,13 @@ function Layout({ children }: { children: React.ReactNode }) {
 function Brand() {
   return (
     <div className="mb-8">
-      <div className="flex items-baseline gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">Founders Inbody</h1>
+      <div className="mono text-[11px] uppercase tracking-[0.28em] text-stone-400">Founders Inbody</div>
+      <div className="mt-3 flex items-baseline gap-3">
+        <h1 className="text-4xl font-bold tracking-tight">대표님의 경영 숫자를 한 장으로 읽어드립니다</h1>
         <span className="mono text-xs text-stone-500">v3</span>
       </div>
-      <p className="mt-2 text-sm text-stone-600">
-        대표의 경영 건강 진단 · 10분이면 됩니다.
+      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600">
+        금액은 원 단위로, 인원과 거래처는 각 단위에 맞게 입력받습니다. 결과는 계기판이 먼저 나오고 그 숫자를 해석하는 진단 문장이 뒤따릅니다.
       </p>
     </div>
   );
@@ -789,12 +867,12 @@ function StepView(props: {
 
   // Q3. 연 매출
   questions.push(() => (
-    <Question num={3} title="지난 1년 매출은 얼마였을까요?" subtitle="정부지원금·과제비 포함 총 수입 기준입니다. 세무 자료를 참고해주시면 정확합니다.">
+    <Question num={3} title="지난 1년 매출은 얼마입니까?" subtitle="정부지원금·과제비 포함 총 수입 기준입니다. 세무 자료를 참고해주시면 정확합니다.">
       <NumInput
         value={a.annualRevenue}
         onChange={(v) => setA('annualRevenue', v)}
-        placeholder="예: 30000"
-        unit="만원"
+        placeholder="예: 300,000,000"
+        unit="원"
       />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualRevenue != null && a.annualRevenue > 0} />
     </Question>
@@ -802,12 +880,12 @@ function StepView(props: {
 
   // Q4. 영업이익
   questions.push(() => (
-    <Question num={4} title="지난 1년 영업이익은 얼마였을까요?" subtitle="적자면 앞에 마이너스(−)를 붙여주시면 됩니다.">
+    <Question num={4} title="지난 1년 영업이익은 얼마입니까?" subtitle="적자면 앞에 마이너스(−)를 붙여주시면 됩니다.">
       <NumInput
         value={a.annualOperatingProfit}
         onChange={(v) => setA('annualOperatingProfit', v)}
-        placeholder="예: 1500 또는 -500"
-        unit="만원"
+        placeholder="예: 15,000,000 또는 -5,000,000"
+        unit="원"
         allowNegative
       />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualOperatingProfit != null} />
@@ -816,12 +894,12 @@ function StepView(props: {
 
   // Q5. 현금
   questions.push(() => (
-    <Question num={5} title="지금 바로 사용 가능한 현금은 얼마일까요?" subtitle="통장 잔액 기준이면 충분합니다.">
+    <Question num={5} title="지금 바로 사용 가능한 현금은 얼마입니까?" subtitle="통장 잔액 기준이면 충분합니다.">
       <NumInput
         value={a.cash}
         onChange={(v) => setA('cash', v)}
-        placeholder="예: 5000"
-        unit="만원"
+        placeholder="예: 50,000,000"
+        unit="원"
       />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.cash != null && a.cash >= 0} />
     </Question>
@@ -829,12 +907,12 @@ function StepView(props: {
 
   // Q6. 월 고정비
   questions.push(() => (
-    <Question num={6} title="월 고정비는 대략 얼마일까요?" subtitle="월급·임대료·고정 구독료 합계입니다. 정확히 몰라도 대략이면 됩니다.">
+    <Question num={6} title="월 고정비는 대략 얼마입니까?" subtitle="월급·임대료·고정 구독료 합계입니다. 정확히 몰라도 대략이면 됩니다.">
       <NumInput
         value={a.monthlyFixedCost}
         onChange={(v) => setA('monthlyFixedCost', v)}
-        placeholder="예: 1000"
-        unit="만원"
+        placeholder="예: 10,000,000"
+        unit="원"
       />
       <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.monthlyFixedCost != null && a.monthlyFixedCost > 0} />
     </Question>
@@ -842,7 +920,7 @@ function StepView(props: {
 
   // Q7. 인원수
   questions.push(() => (
-    <Question num={7} title="정규 인원은 몇 명일까요?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
+    <Question num={7} title="정규 인원은 몇 명입니까?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
       <NumInput
         value={a.headcount}
         onChange={(v) => setA('headcount', v)}
@@ -885,71 +963,71 @@ function StepView(props: {
   // 공식별 분기 질문
   if (a.primaryFormula === 'A') {
     questions.push(() => (
-      <Question num={9} title="지난 3개월간 한 번이라도 결제한 고객 수는 얼마일까요?" subtitle="대략이어도 괜찮습니다.">
+      <Question num={9} title="지난 3개월간 한 번이라도 결제한 고객은 몇 명입니까?" subtitle="대략이어도 괜찮습니다.">
         <NumInput value={a.activeCustomers3m} onChange={(v) => setA('activeCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeCustomers3m != null && a.activeCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="그중 2회 이상 결제한 고객은 몇 명일까요?" subtitle="재구매율을 자동 계산합니다.">
+      <Question num={10} title="그중 2회 이상 결제한 고객은 몇 명입니까?" subtitle="재구매율을 자동 계산합니다.">
         <NumInput value={a.repeatCustomers3m} onChange={(v) => setA('repeatCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.repeatCustomers3m != null && a.repeatCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="평균 1회 결제 금액은 얼마일까요?">
-        <NumInput value={a.avgOrderValue} onChange={(v) => setA('avgOrderValue', v)} unit="만원" />
+      <Question num={11} title="평균 1회 결제 금액은 얼마입니까?">
+        <NumInput value={a.avgOrderValue} onChange={(v) => setA('avgOrderValue', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgOrderValue != null && a.avgOrderValue >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'B') {
     questions.push(() => (
-      <Question num={9} title="지난달 신규 상담·가입·문의 수는 얼마일까요?">
+      <Question num={9} title="지난달 신규 상담·가입·문의는 몇 건입니까?">
         <NumInput value={a.newLeadsLastMonth} onChange={(v) => setA('newLeadsLastMonth', v)} unit="건" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newLeadsLastMonth != null && a.newLeadsLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="그중 유료 전환된 고객은 몇 명일까요?">
+      <Question num={10} title="그중 유료 전환된 고객은 몇 명입니까?">
         <NumInput value={a.newPaidLastMonth} onChange={(v) => setA('newPaidLastMonth', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newPaidLastMonth != null && a.newPaidLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="신규 고객 평균 결제 금액은 얼마일까요?">
-        <NumInput value={a.newCustomerAOV} onChange={(v) => setA('newCustomerAOV', v)} unit="만원" />
+      <Question num={11} title="신규 고객 평균 결제 금액은 얼마입니까?">
+        <NumInput value={a.newCustomerAOV} onChange={(v) => setA('newCustomerAOV', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newCustomerAOV != null && a.newCustomerAOV >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'C') {
     questions.push(() => (
-      <Question num={9} title="지난 1년 누적 고객 수는 대략 얼마일까요?">
+      <Question num={9} title="지난 1년 누적 고객은 대략 몇 명입니까?">
         <NumInput value={a.annualCustomers} onChange={(v) => setA('annualCustomers', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualCustomers != null && a.annualCustomers >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="평균 객단가는 얼마일까요?">
-        <NumInput value={a.avgTicket} onChange={(v) => setA('avgTicket', v)} unit="만원" />
+      <Question num={10} title="평균 객단가는 얼마입니까?">
+        <NumInput value={a.avgTicket} onChange={(v) => setA('avgTicket', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgTicket != null && a.avgTicket >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'D') {
     questions.push(() => (
-      <Question num={9} title="현재 매출이 발생하는 거래처는 몇 개일까요?">
+      <Question num={9} title="현재 매출이 발생하는 거래처는 몇 개입니까?">
         <NumInput value={a.activeAccounts} onChange={(v) => setA('activeAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeAccounts != null && a.activeAccounts >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개일까요?" subtitle="재계약률을 자동 계산합니다.">
+      <Question num={10} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개입니까?" subtitle="재계약률을 자동 계산합니다.">
         <NumInput value={a.retainedAccounts} onChange={(v) => setA('retainedAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.retainedAccounts != null && a.retainedAccounts >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'E') {
     questions.push(() => (
-      <Question num={9} title="매출을 만드는 핵심 인력은 몇 명일까요?">
+      <Question num={9} title="매출을 만드는 핵심 인력은 몇 명입니까?">
         <NumInput value={a.coreStaffCount} onChange={(v) => setA('coreStaffCount', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.coreStaffCount != null && a.coreStaffCount >= 0} />
       </Question>
@@ -976,8 +1054,8 @@ function StepView(props: {
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="시간당 또는 일당 단가는 얼마일까요?">
-        <NumInput value={a.hourlyRate} onChange={(v) => setA('hourlyRate', v)} unit="만원" />
+      <Question num={11} title="시간당 또는 일당 단가는 얼마입니까?">
+        <NumInput value={a.hourlyRate} onChange={(v) => setA('hourlyRate', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.hourlyRate != null && a.hourlyRate >= 0} />
       </Question>
     ));
@@ -986,8 +1064,8 @@ function StepView(props: {
   // 매출 유형별 분기
   if (a.revenueSource === 'MIX') {
     questions.push(() => (
-      <Question title="지난 1년 수입 중 정부지원금 합계는 얼마였을까요?">
-        <NumInput value={a.govSubsidyAnnual} onChange={(v) => setA('govSubsidyAnnual', v)} unit="만원" />
+      <Question title="지난 1년 수입 중 정부지원금 합계는 얼마입니까?">
+        <NumInput value={a.govSubsidyAnnual} onChange={(v) => setA('govSubsidyAnnual', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onFinish} nextLabel="결과 보기" canNext={a.govSubsidyAnnual != null && a.govSubsidyAnnual >= 0} />
       </Question>
     ));
@@ -1013,7 +1091,7 @@ function StepView(props: {
       </Question>
     ));
     questions.push(() => (
-      <Question title="유료 민간 고객은 몇 명일까요?" subtitle="정부·지원사업 아닌, 자기 돈으로 결제한 고객 수입니다.">
+      <Question title="유료 민간 고객은 몇 명입니까?" subtitle="정부·지원사업 아닌, 자기 돈으로 결제한 고객 수입니다.">
         <NumInput value={a.paidCustomers} onChange={(v) => setA('paidCustomers', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onFinish} nextLabel="결과 보기" canNext={a.paidCustomers != null && a.paidCustomers >= 0} />
       </Question>
@@ -1066,8 +1144,8 @@ function Question({ num, title, subtitle, children }: {
   return (
     <div>
       {num != null && <div className="mono text-xs text-stone-500">Q{num}.</div>}
-      <h2 className="mt-1 text-xl font-medium leading-tight">{title}</h2>
-      {subtitle && <p className="mt-2 text-sm text-stone-600">{subtitle}</p>}
+      <h2 className="mt-2 text-2xl font-medium leading-tight">{title}</h2>
+      {subtitle && <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600">{subtitle}</p>}
       <div className="mt-5">{children}</div>
     </div>
   );
@@ -1081,8 +1159,8 @@ function PillSelect({ active, onClick, children }: {
       onClick={onClick}
       className={`w-full rounded-xl border px-4 py-3 text-left transition ${
         active
-          ? 'border-stone-900 bg-stone-900 text-white'
-          : 'border-stone-200 bg-white hover:border-stone-400'
+          ? 'border-stone-900 bg-stone-900 text-white shadow-lg'
+          : 'border-stone-200 bg-[#fffdf9] hover:border-stone-400'
       }`}
     >
       {children}
@@ -1097,15 +1175,16 @@ function NumInput({ value, onChange, placeholder, unit, allowNegative }: {
   unit?: string;
   allowNegative?: boolean;
 }) {
+  const helperText = unit === '원' ? toKoreanMoney(value) : '';
   return (
     <div className="relative">
       <input
         type="text"
         inputMode={allowNegative ? 'text' : 'numeric'}
-        value={value ?? ''}
+        value={value == null ? '' : formatNumber(value)}
         placeholder={placeholder ?? '숫자를 입력해주십시오'}
         onChange={(e) => {
-          const raw = e.target.value.replace(/[^\d.\-]/g, '');
+          const raw = e.target.value.replace(/[^\d\-]/g, '');
           if (raw === '' || raw === '-') return onChange(undefined);
           const n = Number(raw);
           if (!isNaN(n)) {
@@ -1113,13 +1192,14 @@ function NumInput({ value, onChange, placeholder, unit, allowNegative }: {
             onChange(n);
           }
         }}
-        className="mono w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-lg outline-none focus:border-stone-900"
+        className="mono w-full rounded-[1.25rem] border border-stone-200 bg-[#fffdf9] px-5 py-4 text-xl outline-none transition focus:border-stone-900"
       />
       {unit && (
-        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-stone-500">
+        <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-sm text-stone-500">
           {unit}
         </span>
       )}
+      {helperText && <p className="mt-3 text-xs leading-relaxed text-stone-500">{helperText}</p>}
     </div>
   );
 }
@@ -1132,7 +1212,7 @@ function NavBtns({ onPrev, onNext, canNext, nextLabel = '다음' }: {
       {onPrev && (
         <button
           onClick={onPrev}
-          className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm hover:border-stone-400"
+          className="rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm hover:border-stone-400"
         >
           이전
         </button>
@@ -1140,7 +1220,7 @@ function NavBtns({ onPrev, onNext, canNext, nextLabel = '다음' }: {
       <button
         disabled={!canNext}
         onClick={onNext}
-        className="flex-1 rounded-xl bg-stone-900 px-4 py-3 text-sm font-medium text-white transition disabled:bg-stone-300"
+        className="flex-1 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white transition disabled:bg-stone-300"
       >
         {nextLabel}
       </button>
@@ -1166,119 +1246,107 @@ function ResultView({ diagnosis, onRestart }: { diagnosis: Diagnosis; onRestart:
   const d = diagnosis;
   return (
     <Layout>
-      <div className="mx-auto max-w-2xl px-6 py-10">
-        {/* 헤더 */}
-        <div className="flex items-baseline justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">진단 결과</h1>
-            <p className="mt-1 text-sm text-stone-600">원자료 기반 · 한국은행 2024 업종 평균 반영</p>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_24px_80px_rgba(28,25,23,0.08)] backdrop-blur sm:p-8 lg:p-10">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <div className="mono text-[11px] uppercase tracking-[0.28em] text-stone-400">Result Sheet</div>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">진단 결과</h1>
+              <p className="mt-1 text-sm text-stone-600">원자료 기반 · 한국은행 2024 업종 평균 반영</p>
+            </div>
+            <button onClick={onRestart} className="mono text-xs text-stone-500 underline">다시 진단</button>
           </div>
-          <button onClick={onRestart} className="mono text-xs text-stone-500 underline">다시 진단</button>
+
+          <Section num="01" title="경영 계기판">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              {d.dashboard.map((m, i) => (
+                <div key={i} className={`${i === 0 ? 'border-stone-900 bg-stone-900 text-white' : 'border-stone-200 bg-[#fffdf9] text-stone-900'} rounded-[1.6rem] border p-5 shadow-sm`}>
+                  <div className={`${i === 0 ? 'text-stone-300' : 'text-stone-500'} text-xs`}>{m.label}</div>
+                  <div className="mono mt-3 text-2xl font-semibold">{m.value}</div>
+                  {m.note && <div className={`${i === 0 ? 'text-stone-300' : 'text-stone-500'} mt-3 text-[11px] leading-relaxed`}>{m.note}</div>}
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section num="02" title="한 줄 진단">
+            <div className="rounded-[1.8rem] border border-stone-900 bg-stone-900 p-6 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)]">
+              <div className="mono text-xs text-stone-400">{d.type}</div>
+              <p className="mt-3 text-lg leading-relaxed">{d.headline.asIs}</p>
+              <p className="mt-3 text-base leading-relaxed text-stone-200">→ {d.headline.toBe}</p>
+              {d.headline.context && (
+                <div className="mt-5 border-t border-stone-700 pt-4 text-xs leading-relaxed text-stone-400">
+                  참고. {d.headline.context}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section num="03" title="이번 달 집중 지표">
+            <div className="rounded-[1.6rem] border border-stone-200 bg-[#fffdf9] p-6">
+              <div className="text-xs text-stone-500">{d.mainLever.name}</div>
+              <div className="mono mt-2 text-4xl font-semibold">{d.mainLever.value}</div>
+              <div className="mt-3 text-xs leading-relaxed text-stone-500">{d.mainLever.benchmark}</div>
+              {d.mainLever.benchmarkNote && (
+                <div className="mt-3 rounded-2xl bg-stone-50 p-4 text-xs leading-relaxed text-stone-600">
+                  💡 {d.mainLever.benchmarkNote}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section num="04" title="행동 전략 3가지">
+            <div className="space-y-4">
+              {d.actions.map((ac, i) => (
+                <ActionCardView key={i} card={ac} idx={i + 1} />
+              ))}
+            </div>
+          </Section>
+
+          <Section num="05" title="잉여금·현금 운용 우선순위">
+            <div className="rounded-[1.6rem] border border-stone-200 bg-[#fffdf9] p-6">
+              <div className="text-sm font-medium">{d.cashAdvice.stage}</div>
+              <div className="mt-4">
+                <div className="text-xs font-medium text-stone-500">먼저 하실 것</div>
+                <ol className="mt-2 space-y-2">
+                  {d.cashAdvice.priorities.map((p, i) => (
+                    <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                      <span className="mono text-stone-400">{i + 1}.</span>
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div className="mt-5 border-t border-stone-100 pt-4">
+                <div className="text-xs font-medium text-stone-500">이 단계에서 피하실 것</div>
+                <ul className="mt-2 space-y-1.5">
+                  {d.cashAdvice.avoid.map((x, i) => (
+                    <li key={i} className="text-sm text-stone-600">✕ {x}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </Section>
+
+          <Section num="" title="" hideTitle>
+            <div className="mt-4 rounded-[1.6rem] border border-stone-200 bg-stone-50 p-5">
+              <div className="mono text-xs text-stone-500">참고 출처</div>
+              <p className="mt-2 text-xs leading-relaxed text-stone-600">
+                · 업종 평균 영업이익률: <strong>{d.sources}</strong><br />
+                · 인건비 추정: 통계청 KOSIS 임금근로자 평균 + 4대보험·복리후생 가산<br />
+                <br />
+                이 진단은 경영 판단 참고 자료이며 법적·재무적 조언이 아닙니다. 재구매율·전환율·재계약률 등은 국내 공식 통계가 없어 비교 기준을 제공하지 않습니다. 회사의 분기별 추세를 함께 보시기 바랍니다.
+              </p>
+            </div>
+          </Section>
+
+          <button
+            onClick={onRestart}
+            className="mt-8 w-full rounded-xl border border-stone-900 bg-white px-4 py-3 text-sm font-medium transition hover:bg-stone-900 hover:text-white"
+          >
+            처음부터 다시 진단하기
+          </button>
         </div>
-
-        {/* 섹션 1: 한줄 진단 */}
-        <Section num="01" title="한 줄 진단">
-          <div className="mt-2 rounded-xl border border-stone-900 bg-stone-900 p-6 text-white">
-            <div className="mono text-xs text-stone-400">{d.type}</div>
-            <p className="mt-3 text-lg leading-relaxed">{d.headline.asIs}</p>
-            <p className="mt-3 text-base leading-relaxed text-stone-200">→ {d.headline.toBe}</p>
-            {d.headline.context && (
-              <div className="mt-5 border-t border-stone-700 pt-4 text-xs leading-relaxed text-stone-400">
-                참고. {d.headline.context}
-              </div>
-            )}
-          </div>
-        </Section>
-
-        {/* 섹션 2: 매출 공식 */}
-        <Section num="02" title="매출 공식">
-          <div className="mono rounded-xl border border-stone-200 bg-white p-4 text-base">
-            {d.formula.expression}
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-stone-700">{d.formula.interpretation}</p>
-        </Section>
-
-        {/* 섹션 3: 메인 지표 */}
-        <Section num="03" title="이번 달 집중 지표">
-          <div className="rounded-xl border border-stone-200 bg-white p-6">
-            <div className="text-xs text-stone-500">{d.mainLever.name}</div>
-            <div className="mono mt-2 text-4xl font-semibold">{d.mainLever.value}</div>
-            <div className="mt-3 text-xs leading-relaxed text-stone-500">{d.mainLever.benchmark}</div>
-            {d.mainLever.benchmarkNote && (
-              <div className="mt-2 rounded-lg bg-stone-50 p-3 text-xs leading-relaxed text-stone-600">
-                💡 {d.mainLever.benchmarkNote}
-              </div>
-            )}
-          </div>
-        </Section>
-
-        {/* 섹션 4: 행동 전략 */}
-        <Section num="04" title="행동 전략 3가지">
-          <div className="space-y-4">
-            {d.actions.map((ac, i) => (
-              <ActionCardView key={i} card={ac} idx={i + 1} />
-            ))}
-          </div>
-        </Section>
-
-        {/* 섹션 5: 현금 전략 */}
-        <Section num="05" title="잉여금·현금 운용 우선순위">
-          <div className="rounded-xl border border-stone-200 bg-white p-6">
-            <div className="text-sm font-medium">{d.cashAdvice.stage}</div>
-            <div className="mt-4">
-              <div className="text-xs font-medium text-stone-500">먼저 하실 것</div>
-              <ol className="mt-2 space-y-2">
-                {d.cashAdvice.priorities.map((p, i) => (
-                  <li key={i} className="flex gap-3 text-sm leading-relaxed">
-                    <span className="mono text-stone-400">{i + 1}.</span>
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <div className="mt-5 border-t border-stone-100 pt-4">
-              <div className="text-xs font-medium text-stone-500">이 단계에서 피하실 것</div>
-              <ul className="mt-2 space-y-1.5">
-                {d.cashAdvice.avoid.map((x, i) => (
-                  <li key={i} className="text-sm text-stone-600">✕ {x}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </Section>
-
-        {/* 섹션 6: 경영 계기판 */}
-        <Section num="06" title="경영 계기판">
-          <div className="grid grid-cols-2 gap-3">
-            {d.dashboard.map((m, i) => (
-              <div key={i} className="rounded-xl border border-stone-200 bg-white p-4">
-                <div className="text-xs text-stone-500">{m.label}</div>
-                <div className="mono mt-1 text-xl font-medium">{m.value}</div>
-                {m.note && <div className="mt-2 text-[11px] leading-relaxed text-stone-500">{m.note}</div>}
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        {/* 출처·면책 */}
-        <Section num="" title="" hideTitle>
-          <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-5">
-            <div className="mono text-xs text-stone-500">참고 출처</div>
-            <p className="mt-2 text-xs leading-relaxed text-stone-600">
-              · 업종 평균 영업이익률: <strong>{d.sources}</strong><br />
-              · 인건비 추정: 통계청 KOSIS 임금근로자 평균 + 4대보험·복리후생 가산<br />
-              <br />
-              이 진단은 경영 판단 참고 자료이며 법적·재무적 조언이 아닙니다. 재구매율·전환율·재계약률 등은 국내 공식 통계가 없어 비교 기준을 제공하지 않습니다. 회사의 분기별 추세를 함께 보시기 바랍니다.
-            </p>
-          </div>
-        </Section>
-
-        <button
-          onClick={onRestart}
-          className="mt-8 w-full rounded-xl border border-stone-900 bg-white px-4 py-3 text-sm font-medium hover:bg-stone-900 hover:text-white transition"
-        >
-          처음부터 다시 진단하기
-        </button>
       </div>
     </Layout>
   );
@@ -1302,7 +1370,7 @@ function Section({ num, title, children, hideTitle }: {
 
 function ActionCardView({ card, idx }: { card: ActionCard; idx: number }) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5">
+    <div className="rounded-[1.6rem] border border-stone-200 bg-[#fffdf9] p-5 shadow-sm">
       <div className="flex items-baseline gap-3">
         <span className="mono text-xs text-stone-400">{String(idx).padStart(2, '0')}</span>
         <h4 className="text-base font-medium leading-snug">{card.title}</h4>

@@ -1,6 +1,8 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { saveResultRecord } from '../lib/result-storage';
 
 /* ============================================================================
  * Founders Inbody v3 — Single-File MVP
@@ -23,7 +25,11 @@ import { useEffect, useMemo, useState } from 'react';
 type Industry =
   | 'MFG_B2B' | 'MFG_B2C'
   | 'RETAIL'
+  | 'ECOMMERCE'
   | 'IT'
+  | 'EDUCATION'
+  | 'CONSULTING'
+  | 'CONTENT_MEDIA'
   | 'MEDICAL_GENERAL' | 'MEDICAL_AESTHETIC'
   | 'BEAUTY'
   | 'HEALTH_SERVICE' | 'HEALTH_PRODUCT' | 'HEALTH_TECH'
@@ -50,6 +56,19 @@ type Answers = {
   latestQuarterOperatingProfit?: number;
   previousQuarterRevenue?: number;
   previousQuarterOperatingProfit?: number;
+  educationAnnualStudents?: number;
+  educationRepeatStudents?: number;
+  educationB2BShare?: number;
+  educationFounderLedShare?: number;
+  consultingRetainerShare?: number;
+  consultingFounderDeliveryShare?: number;
+  consultingPipelineMonths?: number;
+  ecommerceAdSpendQuarter?: number;
+  ecommerceReturnRate?: number;
+  ecommerceTopSkuShare?: number;
+  contentAdRevenueShare?: number;
+  contentPaidConversionRate?: number;
+  contentChannelDependencyShare?: number;
 
   // 2차 매출 공식
   primaryFormula?: FormulaCategory;
@@ -88,7 +107,11 @@ const INDUSTRIES: { code: Industry; label: string; emoji: string; hint?: string 
   { code: 'MFG_B2B',              label: '제조업 B2B',              emoji: '🏭', hint: '기업 대상 제조·부품·소재' },
   { code: 'MFG_B2C',              label: '제조업 B2C (식품 등)',    emoji: '🥫', hint: '소비재·식음료 제조' },
   { code: 'RETAIL',               label: '유통·도소매',             emoji: '🛒', hint: '온·오프라인 판매' },
+  { code: 'ECOMMERCE',            label: '이커머스·D2C',            emoji: '📦', hint: '자사몰·오픈마켓 판매' },
   { code: 'IT',                   label: 'IT·SaaS',                 emoji: '💻', hint: '소프트웨어·플랫폼·앱' },
+  { code: 'EDUCATION',            label: '교육·강의',               emoji: '📚', hint: '온라인 강의·기업교육·아카데미' },
+  { code: 'CONSULTING',           label: '컨설팅·코칭',             emoji: '🧭', hint: '자문·코칭·프로젝트형 지식서비스' },
+  { code: 'CONTENT_MEDIA',        label: '콘텐츠·미디어',            emoji: '🎥', hint: '콘텐츠 판매·광고·구독 수익' },
   { code: 'MEDICAL_GENERAL',      label: '의료 (일반 진료)',        emoji: '🏥', hint: '병의원·보험 진료' },
   { code: 'MEDICAL_AESTHETIC',    label: '의료 (비급여·시술)',      emoji: '💉', hint: '피부·성형·한방 비급여' },
   { code: 'BEAUTY',               label: '뷰티·라이프스타일',        emoji: '💄', hint: '화장품·뷰티 소매' },
@@ -140,7 +163,11 @@ function getBenchmark(industry: Industry): Benchmark {
     MFG_B2B: 'MFG_ALL',
     MFG_B2C: 'MFG_FOOD',
     RETAIL: 'RETAIL_ALL',
+    ECOMMERCE: 'RETAIL_ALL',
     IT: 'IT_SOFTWARE',
+    EDUCATION: 'PROF_SCI_TECH',
+    CONSULTING: 'PROF_SCI_TECH',
+    CONTENT_MEDIA: 'INFO_COMM',
     MEDICAL_GENERAL: 'ARTS_SPORTS',
     MEDICAL_AESTHETIC: 'ARTS_SPORTS',
     BEAUTY: 'RETAIL_OFFLINE',
@@ -420,7 +447,7 @@ function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): D
     headline: {
       asIs: asIsMap[t],
       toBe: toBeMap[t],
-      context: bm.note,
+      context: [bm.note, buildIndustryContext(a, d)].filter(Boolean).join(' '),
     },
     formula: formulaInfo,
     mainLever,
@@ -451,6 +478,75 @@ function buildMetricGuide() {
       body: '인당 영업이익은 사람 수 대비 실제로 얼마를 남기고 있는지 보여줍니다. 매출이 아니라 이익 기준으로 보는 생산성이라 채용 타이밍과 보상 여력을 판단할 때 중요합니다.',
     },
   ];
+}
+
+function industryExtraQuestionCount(industry?: Industry) {
+  switch (industry) {
+    case 'EDUCATION':
+      return 4;
+    case 'CONSULTING':
+      return 3;
+    case 'ECOMMERCE':
+      return 3;
+    case 'CONTENT_MEDIA':
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+function buildIndustryContext(a: Answers, d: Derived) {
+  switch (a.industry) {
+    case 'EDUCATION':
+      return `재수강률 ${a.educationAnnualStudents && a.educationRepeatStudents ? `${((a.educationRepeatStudents / Math.max(1, a.educationAnnualStudents)) * 100).toFixed(1)}%` : '—'}, B2B 비중 ${a.educationB2BShare ?? '—'}%, 대표 직강 비중 ${a.educationFounderLedShare ?? '—'}%를 함께 보셔야 합니다.`;
+    case 'CONSULTING':
+      return `리테이너 비중 ${a.consultingRetainerShare ?? '—'}%, 대표 수행 비중 ${a.consultingFounderDeliveryShare ?? '—'}%, 확보된 파이프라인 ${a.consultingPipelineMonths ?? '—'}개월이 안정성을 좌우합니다.`;
+    case 'ECOMMERCE':
+      return `최근 분기 광고비 ${formatWon(a.ecommerceAdSpendQuarter)}, 반품률 ${a.ecommerceReturnRate ?? '—'}%, 상위 SKU 집중도 ${a.ecommerceTopSkuShare ?? '—'}%가 실제 마진을 크게 흔듭니다.`;
+    case 'CONTENT_MEDIA':
+      return `광고·협찬 비중 ${a.contentAdRevenueShare ?? '—'}%, 유료 전환율 ${a.contentPaidConversionRate ?? '—'}%, 상위 채널 의존도 ${a.contentChannelDependencyShare ?? '—'}%가 핵심입니다.`;
+    default:
+      return d.growthSummary;
+  }
+}
+
+function buildIndustryActionCard(a: Answers): ActionCard | null {
+  switch (a.industry) {
+    case 'EDUCATION':
+      return {
+        title: '재수강과 대표 의존도를 함께 점검하십시오',
+        fact: `연 수강생 ${formatCount(a.educationAnnualStudents)}, 재수강 ${formatCount(a.educationRepeatStudents)}, 대표 직강 비중 ${a.educationFounderLedShare ?? '—'}%.`,
+        insight: '교육업은 신규 모집보다 재수강과 대표 의존도에서 구조 차이가 크게 납니다. 대표가 직접 서야만 팔리는 구조면 성장해도 병목이 남습니다.',
+        action: '재수강률이 높은 강의와 낮은 강의를 나누고, 대표 없이도 운영 가능한 강의 포맷을 1개 먼저 만드십시오.',
+        checklist: ['강의별 재수강률 분리', '대표 비의존 강의 1개 선정', 'B2B 전환 가능 주제 검토'],
+      };
+    case 'CONSULTING':
+      return {
+        title: '리테이너 비중과 파이프라인 개월 수를 먼저 두껍게 하십시오',
+        fact: `리테이너 비중 ${a.consultingRetainerShare ?? '—'}%, 파이프라인 ${a.consultingPipelineMonths ?? '—'}개월.`,
+        insight: '컨설팅업은 단가보다 매출 가시성이 먼저 무너지기 쉽습니다. 리테이너가 얇고 파이프라인이 짧으면 대표가 계속 새 수주를 찾아야 합니다.',
+        action: '프로젝트 고객 중 3곳을 골라 월정액 운영 제안으로 전환하고, 다음 분기 파이프라인을 월별로 수치화하십시오.',
+        checklist: ['기존 고객 3곳 선정', '리테이너 제안안 작성', '월별 파이프라인 표 작성'],
+      };
+    case 'ECOMMERCE':
+      return {
+        title: '매출보다 광고비와 반품률을 함께 보십시오',
+        fact: `최근 분기 광고비 ${formatWon(a.ecommerceAdSpendQuarter)}, 반품률 ${a.ecommerceReturnRate ?? '—'}%, 상위 SKU 집중도 ${a.ecommerceTopSkuShare ?? '—'}%.`,
+        insight: '이커머스는 매출이 늘어도 광고비와 반품이 같이 늘면 실제로 남는 돈은 약해질 수 있습니다.',
+        action: '광고비, 반품률, 상품별 매출 비중을 같은 표에 놓고 상위 상품 3개부터 공헌이익 기준으로 다시 보십시오.',
+        checklist: ['상위 SKU 3개 공헌이익 계산', '반품률 상위 상품 확인', '광고 유지/중단 기준 정리'],
+      };
+    case 'CONTENT_MEDIA':
+      return {
+        title: '광고 의존보다 유료 전환 구조를 키우십시오',
+        fact: `광고·협찬 비중 ${a.contentAdRevenueShare ?? '—'}%, 유료 전환율 ${a.contentPaidConversionRate ?? '—'}%, 상위 채널 의존도 ${a.contentChannelDependencyShare ?? '—'}%.`,
+        insight: '콘텐츠업은 조회수보다 매출 구조가 중요합니다. 특정 채널과 광고 비중이 높으면 외부 플랫폼 변화에 흔들립니다.',
+        action: '유료 전환 가능한 핵심 콘텐츠 1개를 정하고, 상위 채널 외 유입선 1개를 병행해서 키우십시오.',
+        checklist: ['유료화 후보 콘텐츠 1개 선정', '채널 다변화 실험 1개 실행', '광고 외 매출 비중 추적'],
+      };
+    default:
+      return null;
+  }
 }
 
 function buildFormula(a: Answers, d: Derived) {
@@ -536,6 +632,8 @@ function buildMainLever(a: Answers, d: Derived, bm: Benchmark) {
 
 function buildActions(a: Answers, d: Derived, bm: Benchmark, t: ResultType): ActionCard[] {
   const cards: ActionCard[] = [];
+  const industryCard = buildIndustryActionCard(a);
+  if (industryCard) cards.push(industryCard);
 
   // 1번 카드 — 유형 기반
   if (t === '지혈 필요형') {
@@ -744,9 +842,9 @@ function buildDashboard(a: Answers, d: Derived, bm: Benchmark) {
  * ==========================================================================*/
 
 export default function Page() {
+  const router = useRouter();
   const [step, setStep] = useState<number>(0);
   const [answers, setAnswers] = useState<Answers>({});
-  const [showResult, setShowResult] = useState(false);
 
   const setA = <K extends keyof Answers>(k: K, v: Answers[K]) =>
     setAnswers((prev) => ({ ...prev, [k]: v }));
@@ -762,11 +860,18 @@ export default function Page() {
     [answers, derived, bm, mainType],
   );
 
-  if (showResult && diagnosis) {
-    return <ResultView diagnosis={diagnosis} onRestart={() => {
-      setAnswers({}); setStep(0); setShowResult(false);
-    }} />;
-  }
+  const handleFinish = () => {
+    if (!diagnosis) return;
+    const saved = saveResultRecord({
+      input: answers as unknown as Record<string, unknown>,
+      diagnosis,
+    });
+    if (saved) {
+      router.push(`/result/${saved.id}`);
+      return;
+    }
+    router.push('/');
+  };
 
   return (
     <Layout>
@@ -782,7 +887,7 @@ export default function Page() {
                 setA={setA}
                 onNext={() => setStep((s) => s + 1)}
                 onPrev={() => setStep((s) => Math.max(0, s - 1))}
-                onFinish={() => setShowResult(true)}
+                onFinish={handleFinish}
               />
             </div>
           </div>
@@ -849,7 +954,7 @@ function Brand() {
 }
 
 function totalSteps(a: Answers): number {
-  let base = 13; // 공통 12문항 + 공식 선택 1
+  let base = 13 + industryExtraQuestionCount(a.industry); // 공통 12문항 + 공식 선택 1 + 업종추가질문
   if (a.primaryFormula === 'A' || a.primaryFormula === 'B') base += 3;
   if (a.primaryFormula === 'C') base += 2;
   if (a.primaryFormula === 'D') base += 2;
@@ -1180,6 +1285,90 @@ function StepView(props: {
       <Question num={16} title="시간당 또는 일당 단가는 얼마입니까?">
         <NumInput value={a.hourlyRate} onChange={(v) => setA('hourlyRate', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.hourlyRate != null && a.hourlyRate >= 0} />
+      </Question>
+    ));
+  }
+
+  if (a.industry === 'EDUCATION') {
+    questions.push(() => (
+      <Question title="최근 12개월 수강생은 몇 명입니까?" subtitle="무료 체험 제외, 실제 결제한 수강생 기준입니다.">
+        <NumInput value={a.educationAnnualStudents} onChange={(v) => setA('educationAnnualStudents', v)} unit="명" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.educationAnnualStudents != null && a.educationAnnualStudents >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="그중 재수강한 고객은 몇 명입니까?">
+        <NumInput value={a.educationRepeatStudents} onChange={(v) => setA('educationRepeatStudents', v)} unit="명" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.educationRepeatStudents != null && a.educationRepeatStudents >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="기업교육 매출 비중은 몇 %입니까?">
+        <NumInput value={a.educationB2BShare} onChange={(v) => setA('educationB2BShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.educationB2BShare != null && a.educationB2BShare >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="대표가 직접 강의한 매출 비중은 몇 %입니까?">
+        <NumInput value={a.educationFounderLedShare} onChange={(v) => setA('educationFounderLedShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.educationFounderLedShare != null && a.educationFounderLedShare >= 0} />
+      </Question>
+    ));
+  } else if (a.industry === 'CONSULTING') {
+    questions.push(() => (
+      <Question title="리테이너·월정액 매출 비중은 몇 %입니까?">
+        <NumInput value={a.consultingRetainerShare} onChange={(v) => setA('consultingRetainerShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.consultingRetainerShare != null && a.consultingRetainerShare >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="대표가 직접 수행해야 하는 매출 비중은 몇 %입니까?">
+        <NumInput value={a.consultingFounderDeliveryShare} onChange={(v) => setA('consultingFounderDeliveryShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.consultingFounderDeliveryShare != null && a.consultingFounderDeliveryShare >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="현재 확보된 수주 파이프라인은 몇 개월치입니까?">
+        <NumInput value={a.consultingPipelineMonths} onChange={(v) => setA('consultingPipelineMonths', v)} unit="개월" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.consultingPipelineMonths != null && a.consultingPipelineMonths >= 0} />
+      </Question>
+    ));
+  } else if (a.industry === 'ECOMMERCE') {
+    questions.push(() => (
+      <Question title="최근 완료된 분기 광고비는 얼마입니까?">
+        <NumInput value={a.ecommerceAdSpendQuarter} onChange={(v) => setA('ecommerceAdSpendQuarter', v)} unit="원" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.ecommerceAdSpendQuarter != null && a.ecommerceAdSpendQuarter >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="반품률은 몇 %입니까?">
+        <NumInput value={a.ecommerceReturnRate} onChange={(v) => setA('ecommerceReturnRate', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.ecommerceReturnRate != null && a.ecommerceReturnRate >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="상위 3개 SKU가 전체 매출의 몇 %를 차지합니까?">
+        <NumInput value={a.ecommerceTopSkuShare} onChange={(v) => setA('ecommerceTopSkuShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.ecommerceTopSkuShare != null && a.ecommerceTopSkuShare >= 0} />
+      </Question>
+    ));
+  } else if (a.industry === 'CONTENT_MEDIA') {
+    questions.push(() => (
+      <Question title="광고·협찬 매출 비중은 몇 %입니까?">
+        <NumInput value={a.contentAdRevenueShare} onChange={(v) => setA('contentAdRevenueShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.contentAdRevenueShare != null && a.contentAdRevenueShare >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="유료 구독 또는 유료 상품 전환율은 몇 %입니까?">
+        <NumInput value={a.contentPaidConversionRate} onChange={(v) => setA('contentPaidConversionRate', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.contentPaidConversionRate != null && a.contentPaidConversionRate >= 0} />
+      </Question>
+    ));
+    questions.push(() => (
+      <Question title="상위 채널 1개가 전체 매출의 몇 %를 차지합니까?">
+        <NumInput value={a.contentChannelDependencyShare} onChange={(v) => setA('contentChannelDependencyShare', v)} unit="%" />
+        <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.contentChannelDependencyShare != null && a.contentChannelDependencyShare >= 0} />
       </Question>
     ));
   }

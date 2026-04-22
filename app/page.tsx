@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /* ============================================================================
  * Founders Inbody v3 — Single-File MVP
@@ -43,8 +43,13 @@ type Answers = {
   annualRevenue?: number;
   annualOperatingProfit?: number;
   cash?: number;
+  annualLaborCost?: number;
   monthlyFixedCost?: number;
   headcount?: number;
+  latestQuarterRevenue?: number;
+  latestQuarterOperatingProfit?: number;
+  previousQuarterRevenue?: number;
+  previousQuarterOperatingProfit?: number;
 
   // 2차 매출 공식
   primaryFormula?: FormulaCategory;
@@ -208,12 +213,19 @@ type Derived = {
   runwayMonths: number | null;
   hcroi: number | null;
   revenuePerHead: number | null;
+  operatingProfitPerHead: number | null;
   govDependency: number | null;
   privateRevenueCoverage: number | null;
   repeatRate: number | null;
   conversionRate: number | null;
   renewalRate: number | null;
   capacityLabel: string | null;
+  totalMonthlyBurn: number | null;
+  latestQuarterMargin: number | null;
+  previousQuarterMargin: number | null;
+  quarterRevenueGrowth: number | null;
+  quarterProfitGrowth: number | null;
+  growthSummary: string;
   isSME: boolean;
   gcsStage: GcsStage;
 };
@@ -225,11 +237,44 @@ function computeDerived(a: Answers): Derived {
   const r2 = (v: number | null) => (v == null ? null : +v.toFixed(2));
 
   const operatingMargin = pct(div(a.annualOperatingProfit, a.annualRevenue));
-  const runwayMonths = r1(div(a.cash, a.monthlyFixedCost));
-  const laborCost = (a.headcount ?? 0) * ESTIMATED_LABOR_COST_PER_HEAD;
+  const laborCost = a.annualLaborCost ?? null;
+  const totalMonthlyBurn =
+    a.monthlyFixedCost != null || laborCost != null
+      ? Math.round((a.monthlyFixedCost ?? 0) + ((laborCost ?? 0) / 12))
+      : null;
+  const runwayMonths = r1(div(a.cash, totalMonthlyBurn ?? undefined));
   const hcroi = r2(div(a.annualOperatingProfit, laborCost || undefined));
   const revenuePerHeadRaw = div(a.annualRevenue, a.headcount);
   const revenuePerHead = revenuePerHeadRaw == null ? null : Math.round(revenuePerHeadRaw);
+  const operatingProfitPerHeadRaw = div(a.annualOperatingProfit, a.headcount);
+  const operatingProfitPerHead = operatingProfitPerHeadRaw == null ? null : Math.round(operatingProfitPerHeadRaw);
+  const latestQuarterMargin = pct(div(a.latestQuarterOperatingProfit, a.latestQuarterRevenue));
+  const previousQuarterMargin = pct(div(a.previousQuarterOperatingProfit, a.previousQuarterRevenue));
+  const quarterRevenueGrowth = pct(div(
+    (a.latestQuarterRevenue != null && a.previousQuarterRevenue != null)
+      ? a.latestQuarterRevenue - a.previousQuarterRevenue
+      : undefined,
+    a.previousQuarterRevenue,
+  ));
+  const quarterProfitGrowth = pct(div(
+    (a.latestQuarterOperatingProfit != null && a.previousQuarterOperatingProfit != null)
+      ? a.latestQuarterOperatingProfit - a.previousQuarterOperatingProfit
+      : undefined,
+    a.previousQuarterOperatingProfit,
+  ));
+
+  let growthSummary = '분기 흐름 데이터가 아직 부족합니다.';
+  if (quarterRevenueGrowth != null && latestQuarterMargin != null && previousQuarterMargin != null) {
+    if (quarterRevenueGrowth > 10 && latestQuarterMargin >= previousQuarterMargin) {
+      growthSummary = '최근 분기 매출과 이익률이 함께 좋아지고 있습니다.';
+    } else if (quarterRevenueGrowth > 0 && latestQuarterMargin < previousQuarterMargin) {
+      growthSummary = '매출은 늘지만 이익률이 따라오지 못하고 있습니다.';
+    } else if (quarterRevenueGrowth < 0 && latestQuarterMargin >= previousQuarterMargin) {
+      growthSummary = '매출은 둔화됐지만 수익성 방어는 되고 있습니다.';
+    } else if (quarterRevenueGrowth < 0 && latestQuarterMargin < previousQuarterMargin) {
+      growthSummary = '매출과 수익성이 함께 약해지는 흐름입니다.';
+    }
+  }
 
   const govDependency =
     a.revenueSource === 'GOV' ? 100 :
@@ -270,9 +315,11 @@ function computeDerived(a: Answers): Derived {
   }
 
   return {
-    operatingMargin, runwayMonths, hcroi, revenuePerHead,
+    operatingMargin, runwayMonths, hcroi, revenuePerHead, operatingProfitPerHead,
     govDependency, privateRevenueCoverage,
     repeatRate, conversionRate, renewalRate, capacityLabel,
+    totalMonthlyBurn, latestQuarterMargin, previousQuarterMargin,
+    quarterRevenueGrowth, quarterProfitGrowth, growthSummary,
     isSME, gcsStage,
   };
 }
@@ -326,6 +373,7 @@ type Diagnosis = {
   actions: ActionCard[];
   cashAdvice: { stage: string; priorities: string[]; avoid: string[] };
   dashboard: { label: string; value: string; note?: string }[];
+  metricGuide: { title: string; body: string }[];
   sources: string;
 };
 
@@ -334,13 +382,14 @@ function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): D
   const marginLabel = d.operatingMargin != null ? `${d.operatingMargin}%` : '—';
   const runwayLabel = d.runwayMonths != null ? `${d.runwayMonths}개월` : '—';
   const dependencyLabel = d.govDependency != null ? `${d.govDependency}%` : null;
+  const quarterGrowthLabel = d.quarterRevenueGrowth != null ? `${d.quarterRevenueGrowth}%` : '—';
 
   // ── 1. 헤드라인 (As-is / To-be) ──
   const asIsMap: Record<ResultType, string> = {
-    '지혈 필요형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}로 지금은 성장이 아니라 현금 방어가 먼저입니다.`,
-    '지원 의존형': `영업이익률 ${marginLabel}, 지원 의존도 ${dependencyLabel ?? '—'}로 자체 매출 기반을 더 두껍게 만들어야 하는 구간입니다.`,
-    '마진 취약형': `현금 런웨이 ${runwayLabel}는 버티고 있지만 영업이익률 ${marginLabel}로 남는 구조를 다시 짜야 합니다.`,
-    '성장 준비형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}로 기본 체력은 확보됐고 이제 성장 레버를 고를 차례입니다.`,
+    '지혈 필요형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}, 최근 분기 매출 흐름 ${quarterGrowthLabel} 기준으로 지금은 성장이 아니라 현금 방어가 먼저입니다.`,
+    '지원 의존형': `영업이익률 ${marginLabel}, 지원 의존도 ${dependencyLabel ?? '—'}, 최근 분기 흐름을 함께 보면 자체 매출 기반을 더 두껍게 만들어야 하는 구간입니다.`,
+    '마진 취약형': `현금 런웨이 ${runwayLabel}는 버티고 있지만 영업이익률 ${marginLabel}과 최근 분기 흐름을 보면 남는 구조를 다시 짜야 합니다.`,
+    '성장 준비형': `영업이익률 ${marginLabel}, 현금 런웨이 ${runwayLabel}, 최근 분기 매출 흐름 ${quarterGrowthLabel}로 기본 체력은 확보됐고 이제 성장 레버를 고를 차례입니다.`,
   };
   const toBeMap: Record<ResultType, string> = {
     '지혈 필요형': '3개월 안에 런웨이 6개월 이상 확보하는 게 목표입니다.',
@@ -363,6 +412,7 @@ function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): D
 
   // ── 6. 경영 계기판 ──
   const dashboard = buildDashboard(a, d, bm);
+  const metricGuide = buildMetricGuide();
 
   return {
     type: t,
@@ -377,8 +427,30 @@ function buildDiagnosis(a: Answers, d: Derived, bm: Benchmark, t: ResultType): D
     actions,
     cashAdvice,
     dashboard,
+    metricGuide,
     sources: `한국은행 「2024년 기업경영분석」 (2025.10 공표) · ${bm.label} (${bm.ksicCode}) ${d.isSME ? '중소기업' : '전체'} 기준`,
   };
+}
+
+function buildMetricGuide() {
+  return [
+    {
+      title: '영업이익률을 보는 이유',
+      body: '매출이 커도 영업이익률이 낮으면 바쁘기만 하고 회사에 남는 돈이 적습니다. 업종 평균보다 얼마나 남기고 있는지 보면 구조의 건강도를 빠르게 읽을 수 있습니다.',
+    },
+    {
+      title: '현금 런웨이를 보는 이유',
+      body: '흑자 회사도 현금이 먼저 마르면 흔들립니다. 런웨이는 지금 속도로 버틸 수 있는 시간을 보여줘서 채용, 투자, 비용 통제의 기준점이 됩니다.',
+    },
+    {
+      title: '인당 매출을 보는 이유',
+      body: '인당 매출은 현재 인력 구조가 얼마나 효율적으로 매출을 만들고 있는지 보여줍니다. 사람이 늘어도 이 숫자가 계속 내려가면 조직 설계나 상품 구조를 다시 봐야 합니다.',
+    },
+    {
+      title: '인당 영업이익을 보는 이유',
+      body: '인당 영업이익은 사람 수 대비 실제로 얼마를 남기고 있는지 보여줍니다. 매출이 아니라 이익 기준으로 보는 생산성이라 채용 타이밍과 보상 여력을 판단할 때 중요합니다.',
+    },
+  ];
 }
 
 function buildFormula(a: Answers, d: Derived) {
@@ -425,7 +497,7 @@ function buildMainLever(a: Answers, d: Derived, bm: Benchmark) {
     return {
       name: '현금 런웨이',
       value: d.runwayMonths != null ? `${d.runwayMonths}개월` : '—',
-      benchmark: '경영 판단 기준: 3개월 미만 즉시 방어 / 3~6개월 경계 / 6개월 이상 안정',
+      benchmark: `월 총 소진액 ${formatWon(d.totalMonthlyBurn)} 기준. 3개월 미만 즉시 방어 / 3~6개월 경계 / 6개월 이상 안정`,
     };
   }
 
@@ -457,7 +529,7 @@ function buildMainLever(a: Answers, d: Derived, bm: Benchmark) {
   return {
     name: '영업이익률',
     value: d.operatingMargin != null ? `${d.operatingMargin}%` : '—',
-    benchmark: `${bm.label} ${bmScope} 평균 ${bmMargin.toFixed(1)}%`,
+    benchmark: `${bm.label} ${bmScope} 평균 ${bmMargin.toFixed(1)}% · ${d.growthSummary}`,
     benchmarkNote: bm.note,
   };
 }
@@ -469,7 +541,7 @@ function buildActions(a: Answers, d: Derived, bm: Benchmark, t: ResultType): Act
   if (t === '지혈 필요형') {
     cards.push({
       title: '이번 주에 현금 30일치를 별도 계좌로 분리하십시오',
-      fact: `현재 런웨이 ${d.runwayMonths ?? '—'}개월. 월 고정비 ${formatWon(a.monthlyFixedCost)}.`,
+      fact: `현재 런웨이 ${d.runwayMonths ?? '—'}개월. 월 총 소진액 ${formatWon(d.totalMonthlyBurn)}, 인건비 제외 고정비 ${formatWon(a.monthlyFixedCost)}.`,
       insight: '런웨이가 짧을 때 가장 먼저 무너지는 건 심리입니다. 총 잔액을 매일 보면 판단력이 떨어집니다. 운영 계좌와 방어 계좌를 물리적으로 분리하면 남은 자원으로 무엇을 할지 차분하게 결정할 수 있습니다.',
       action: '오늘 안에 별도 계좌를 하나 개설하고, 월 고정비 1개월치를 이체하십시오. 이 계좌 카드는 평상시 쓰지 않습니다.',
       checklist: ['별도 계좌 개설', '월 고정비 1개월치 이체', '카드 지갑에서 분리'],
@@ -629,7 +701,7 @@ function buildDashboard(a: Answers, d: Derived, bm: Benchmark) {
   arr.push({
     label: '현금 런웨이',
     value: d.runwayMonths != null ? `${d.runwayMonths}개월` : '—',
-    note: '3개월 미만: 방어 / 3~6: 경계 / 6+: 안정',
+    note: `월 총 소진액 ${formatWon(d.totalMonthlyBurn)} 기준`,
   });
 
   arr.push({
@@ -639,9 +711,21 @@ function buildDashboard(a: Answers, d: Derived, bm: Benchmark) {
   });
 
   arr.push({
+    label: '인당 영업이익',
+    value: d.operatingProfitPerHead != null ? formatWon(d.operatingProfitPerHead) : '—',
+    note: '사람 1명당 실제 얼마를 남기는지 보는 생산성 지표입니다.',
+  });
+
+  arr.push({
+    label: '최근 분기 매출 증감',
+    value: d.quarterRevenueGrowth != null ? `${d.quarterRevenueGrowth}%` : '—',
+    note: d.growthSummary,
+  });
+
+  arr.push({
     label: '인건비 1원당 영업이익',
     value: d.hcroi != null ? `${d.hcroi}배` : '—',
-    note: '0.3 미만: 점검 신호 (공식 통계 없음, 경영 판단 기준)',
+    note: '총 인건비 대비 이익 효율입니다. 0.3 미만이면 구조 점검 신호입니다.',
   });
 
   if (d.govDependency != null) {
@@ -765,7 +849,7 @@ function Brand() {
 }
 
 function totalSteps(a: Answers): number {
-  let base = 8; // 1차 7문항 + 공식 선택 1
+  let base = 13; // 공통 12문항 + 공식 선택 1
   if (a.primaryFormula === 'A' || a.primaryFormula === 'B') base += 3;
   if (a.primaryFormula === 'C') base += 2;
   if (a.primaryFormula === 'D') base += 2;
@@ -865,9 +949,9 @@ function StepView(props: {
     </Question>
   ));
 
-  // Q3. 연 매출
+  // Q3. 최근 12개월 매출
   questions.push(() => (
-    <Question num={3} title="지난 1년 매출은 얼마입니까?" subtitle="정부지원금·과제비 포함 총 수입 기준입니다. 세무 자료를 참고해주시면 정확합니다.">
+    <Question num={3} title="최근 12개월 매출은 얼마입니까?" subtitle="직전 12개월 합계로 적어주셔도 좋고, 2025년 연간 매출을 대신 넣으셔도 됩니다.">
       <NumInput
         value={a.annualRevenue}
         onChange={(v) => setA('annualRevenue', v)}
@@ -878,9 +962,9 @@ function StepView(props: {
     </Question>
   ));
 
-  // Q4. 영업이익
+  // Q4. 최근 12개월 영업이익
   questions.push(() => (
-    <Question num={4} title="지난 1년 영업이익은 얼마입니까?" subtitle="적자면 앞에 마이너스(−)를 붙여주시면 됩니다.">
+    <Question num={4} title="직전 입력한 12개월 영업이익은 얼마입니까?" subtitle="적자면 마이너스까지 포함해 입력해주세요.">
       <NumInput
         value={a.annualOperatingProfit}
         onChange={(v) => setA('annualOperatingProfit', v)}
@@ -905,9 +989,22 @@ function StepView(props: {
     </Question>
   ));
 
-  // Q6. 월 고정비
+  // Q6. 최근 12개월 총 인건비
   questions.push(() => (
-    <Question num={6} title="월 고정비는 대략 얼마입니까?" subtitle="월급·임대료·고정 구독료 합계입니다. 정확히 몰라도 대략이면 됩니다.">
+    <Question num={6} title="최근 12개월 총 인건비는 얼마입니까?" subtitle="급여 + 상여 + 4대보험 회사부담분까지 포함한 총액으로 적어주세요.">
+      <NumInput
+        value={a.annualLaborCost}
+        onChange={(v) => setA('annualLaborCost', v)}
+        placeholder="예: 240,000,000"
+        unit="원"
+      />
+      <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualLaborCost != null && a.annualLaborCost > 0} />
+    </Question>
+  ));
+
+  // Q7. 월 고정비(인건비 제외)
+  questions.push(() => (
+    <Question num={7} title="월 고정비는 얼마입니까?" subtitle="인건비는 제외하고, 임대료·구독료·관리비 등 매달 반복되는 비용만 적어주세요.">
       <NumInput
         value={a.monthlyFixedCost}
         onChange={(v) => setA('monthlyFixedCost', v)}
@@ -918,9 +1015,9 @@ function StepView(props: {
     </Question>
   ));
 
-  // Q7. 인원수
+  // Q8. 인원수
   questions.push(() => (
-    <Question num={7} title="정규 인원은 몇 명입니까?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
+    <Question num={8} title="정규 인원은 몇 명입니까?" subtitle="대표 포함. 외주·파트타임은 제외해주세요.">
       <NumInput
         value={a.headcount}
         onChange={(v) => setA('headcount', v)}
@@ -931,10 +1028,36 @@ function StepView(props: {
     </Question>
   ));
 
-  // Q8. 매출 공식
+  // Q9~Q12. 최근 분기 흐름
+  questions.push(() => (
+    <Question num={9} title="최근 완료된 분기 매출은 얼마입니까?" subtitle="예: 2026년 1분기 매출">
+      <NumInput value={a.latestQuarterRevenue} onChange={(v) => setA('latestQuarterRevenue', v)} unit="원" placeholder="예: 90,000,000" />
+      <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.latestQuarterRevenue != null && a.latestQuarterRevenue > 0} />
+    </Question>
+  ));
+  questions.push(() => (
+    <Question num={10} title="최근 완료된 분기 영업이익은 얼마입니까?" subtitle="예: 2026년 1분기 영업이익">
+      <NumInput value={a.latestQuarterOperatingProfit} onChange={(v) => setA('latestQuarterOperatingProfit', v)} unit="원" allowNegative placeholder="예: -5,000,000" />
+      <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.latestQuarterOperatingProfit != null} />
+    </Question>
+  ));
+  questions.push(() => (
+    <Question num={11} title="그 직전 분기 매출은 얼마입니까?" subtitle="예: 2025년 4분기 매출">
+      <NumInput value={a.previousQuarterRevenue} onChange={(v) => setA('previousQuarterRevenue', v)} unit="원" placeholder="예: 80,000,000" />
+      <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.previousQuarterRevenue != null && a.previousQuarterRevenue > 0} />
+    </Question>
+  ));
+  questions.push(() => (
+    <Question num={12} title="그 직전 분기 영업이익은 얼마입니까?" subtitle="예: 2025년 4분기 영업이익">
+      <NumInput value={a.previousQuarterOperatingProfit} onChange={(v) => setA('previousQuarterOperatingProfit', v)} unit="원" allowNegative placeholder="예: 8,000,000" />
+      <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.previousQuarterOperatingProfit != null} />
+    </Question>
+  ));
+
+  // Q13. 매출 공식
   questions.push(() => (
     <Question
-      num={8}
+      num={13}
       title="우리 회사 매출이 가장 크게 움직이는 축은 무엇일까요?"
       subtitle="하나를 골라주시면 이후 질문이 맞춤으로 바뀝니다."
     >
@@ -963,77 +1086,77 @@ function StepView(props: {
   // 공식별 분기 질문
   if (a.primaryFormula === 'A') {
     questions.push(() => (
-      <Question num={9} title="지난 3개월간 한 번이라도 결제한 고객은 몇 명입니까?" subtitle="대략이어도 괜찮습니다.">
+      <Question num={14} title="지난 3개월간 한 번이라도 결제한 고객은 몇 명입니까?" subtitle="대략이어도 괜찮습니다.">
         <NumInput value={a.activeCustomers3m} onChange={(v) => setA('activeCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeCustomers3m != null && a.activeCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="그중 2회 이상 결제한 고객은 몇 명입니까?" subtitle="재구매율을 자동 계산합니다.">
+      <Question num={15} title="그중 2회 이상 결제한 고객은 몇 명입니까?" subtitle="재구매율을 자동 계산합니다.">
         <NumInput value={a.repeatCustomers3m} onChange={(v) => setA('repeatCustomers3m', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.repeatCustomers3m != null && a.repeatCustomers3m >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="평균 1회 결제 금액은 얼마입니까?">
+      <Question num={16} title="평균 1회 결제 금액은 얼마입니까?">
         <NumInput value={a.avgOrderValue} onChange={(v) => setA('avgOrderValue', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgOrderValue != null && a.avgOrderValue >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'B') {
     questions.push(() => (
-      <Question num={9} title="지난달 신규 상담·가입·문의는 몇 건입니까?">
+      <Question num={14} title="지난달 신규 상담·가입·문의는 몇 건입니까?">
         <NumInput value={a.newLeadsLastMonth} onChange={(v) => setA('newLeadsLastMonth', v)} unit="건" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newLeadsLastMonth != null && a.newLeadsLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="그중 유료 전환된 고객은 몇 명입니까?">
+      <Question num={15} title="그중 유료 전환된 고객은 몇 명입니까?">
         <NumInput value={a.newPaidLastMonth} onChange={(v) => setA('newPaidLastMonth', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newPaidLastMonth != null && a.newPaidLastMonth >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="신규 고객 평균 결제 금액은 얼마입니까?">
+      <Question num={16} title="신규 고객 평균 결제 금액은 얼마입니까?">
         <NumInput value={a.newCustomerAOV} onChange={(v) => setA('newCustomerAOV', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.newCustomerAOV != null && a.newCustomerAOV >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'C') {
     questions.push(() => (
-      <Question num={9} title="지난 1년 누적 고객은 대략 몇 명입니까?">
+      <Question num={14} title="지난 1년 누적 고객은 대략 몇 명입니까?">
         <NumInput value={a.annualCustomers} onChange={(v) => setA('annualCustomers', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.annualCustomers != null && a.annualCustomers >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="평균 객단가는 얼마입니까?">
+      <Question num={15} title="평균 객단가는 얼마입니까?">
         <NumInput value={a.avgTicket} onChange={(v) => setA('avgTicket', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.avgTicket != null && a.avgTicket >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'D') {
     questions.push(() => (
-      <Question num={9} title="현재 매출이 발생하는 거래처는 몇 개입니까?">
+      <Question num={14} title="현재 매출이 발생하는 거래처는 몇 개입니까?">
         <NumInput value={a.activeAccounts} onChange={(v) => setA('activeAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.activeAccounts != null && a.activeAccounts >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개입니까?" subtitle="재계약률을 자동 계산합니다.">
+      <Question num={15} title="작년 거래처 중 올해도 거래가 이어지는 곳은 몇 개입니까?" subtitle="재계약률을 자동 계산합니다.">
         <NumInput value={a.retainedAccounts} onChange={(v) => setA('retainedAccounts', v)} unit="개" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.retainedAccounts != null && a.retainedAccounts >= 0} />
       </Question>
     ));
   } else if (a.primaryFormula === 'E') {
     questions.push(() => (
-      <Question num={9} title="매출을 만드는 핵심 인력은 몇 명입니까?">
+      <Question num={14} title="매출을 만드는 핵심 인력은 몇 명입니까?">
         <NumInput value={a.coreStaffCount} onChange={(v) => setA('coreStaffCount', v)} unit="명" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.coreStaffCount != null && a.coreStaffCount >= 0} />
       </Question>
     ));
     questions.push(() => (
-      <Question num={10} title="이 인력의 현재 가동 상태는 어떠합니까?">
+      <Question num={15} title="이 인력의 현재 가동 상태는 어떠합니까?">
         <div className="space-y-2">
           {[
             { code: 'SLACK', label: '여유 있음', hint: '일이 부족함' },
@@ -1054,7 +1177,7 @@ function StepView(props: {
       </Question>
     ));
     questions.push(() => (
-      <Question num={11} title="시간당 또는 일당 단가는 얼마입니까?">
+      <Question num={16} title="시간당 또는 일당 단가는 얼마입니까?">
         <NumInput value={a.hourlyRate} onChange={(v) => setA('hourlyRate', v)} unit="원" />
         <NavBtns onPrev={onPrev} onNext={onNext} canNext={a.hourlyRate != null && a.hourlyRate >= 0} />
       </Question>
@@ -1175,20 +1298,52 @@ function NumInput({ value, onChange, placeholder, unit, allowNegative }: {
   unit?: string;
   allowNegative?: boolean;
 }) {
+  const [text, setText] = useState(value == null ? '' : formatNumber(value));
+
+  useEffect(() => {
+    if (value == null) {
+      setText('');
+      return;
+    }
+    const formatted = formatNumber(value);
+    setText((prev) => {
+      const normalizedPrev = prev.replace(/,/g, '');
+      return normalizedPrev === String(value) || prev === formatted ? prev : formatted;
+    });
+  }, [value]);
+
   const helperText = unit === '원' ? toKoreanMoney(value) : '';
   return (
     <div className="relative">
       <input
         type="text"
         inputMode={allowNegative ? 'text' : 'numeric'}
-        value={value == null ? '' : formatNumber(value)}
+        value={text}
         placeholder={placeholder ?? '숫자를 입력해주십시오'}
         onChange={(e) => {
           const raw = e.target.value.replace(/[^\d\-]/g, '');
-          if (raw === '' || raw === '-') return onChange(undefined);
-          const n = Number(raw);
+          if (!allowNegative) {
+            const positiveRaw = raw.replace(/-/g, '');
+            setText(positiveRaw === '' ? '' : formatNumber(Number(positiveRaw)));
+            if (positiveRaw === '') return onChange(undefined);
+            const n = Number(positiveRaw);
+            if (!Number.isNaN(n)) onChange(n);
+            return;
+          }
+
+          if (raw === '' || raw === '-') {
+            setText(raw);
+            return onChange(undefined);
+          }
+
+          const normalized = raw.startsWith('-')
+            ? `-${raw.slice(1).replace(/-/g, '')}`
+            : raw.replace(/-/g, '');
+          setText(normalized.startsWith('-')
+            ? `-${formatNumber(Number(normalized.slice(1)))}`
+            : formatNumber(Number(normalized)));
+          const n = Number(normalized);
           if (!isNaN(n)) {
-            if (!allowNegative && n < 0) return;
             onChange(n);
           }
         }}
@@ -1269,7 +1424,7 @@ function ResultView({ diagnosis, onRestart }: { diagnosis: Diagnosis; onRestart:
             </div>
           </Section>
 
-          <Section num="02" title="한 줄 진단">
+          <Section num="02" title="계기판 해석">
             <div className="rounded-[1.8rem] border border-stone-900 bg-stone-900 p-6 text-white shadow-[0_24px_60px_rgba(28,25,23,0.18)]">
               <div className="mono text-xs text-stone-400">{d.type}</div>
               <p className="mt-3 text-lg leading-relaxed">{d.headline.asIs}</p>
@@ -1325,6 +1480,17 @@ function ResultView({ diagnosis, onRestart }: { diagnosis: Diagnosis; onRestart:
                   ))}
                 </ul>
               </div>
+            </div>
+          </Section>
+
+          <Section num="06" title="왜 이 숫자를 보나">
+            <div className="grid gap-4 md:grid-cols-2">
+              {d.metricGuide.map((item) => (
+                <div key={item.title} className="rounded-[1.5rem] border border-stone-200 bg-[#fffdf9] p-5 shadow-sm">
+                  <h4 className="text-sm font-semibold text-stone-900">{item.title}</h4>
+                  <p className="mt-3 text-sm leading-relaxed text-stone-600">{item.body}</p>
+                </div>
+              ))}
             </div>
           </Section>
 
